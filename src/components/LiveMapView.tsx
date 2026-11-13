@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Layers,
   LocateFixed,
+  MessageCircle,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -15,8 +16,11 @@ import {
 import { SEED_WARDS } from '../data/civicSeedData';
 import type { CivicReport, WardRecord } from '../types/civic';
 import { BASEMAP_ORDER, BASEMAPS, osmDirectionsUrl, type BasemapId } from '../utils/mapTiles';
+import { openWhatsAppShare } from '../utils/share';
 import { resolveWardByCoordinates } from '../utils/wardResolver';
 import { InteractiveMap } from './InteractiveMap';
+import { RefBadge } from './RefBadge';
+import { SlaCountdown } from './SlaCountdown';
 import { SmartImage } from './SmartImage';
 
 interface LiveMapViewProps {
@@ -296,6 +300,11 @@ export const LiveMapView: React.FC<LiveMapViewProps> = ({
                   </span>
                 </div>
 
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <RefBadge value={selectedReport.municipalRef} />
+                  <SlaCountdown report={selectedReport} />
+                </div>
+
                 <a
                   href={osmDirectionsUrl(selectedReport.lat, selectedReport.lng)}
                   target="_blank"
@@ -312,6 +321,26 @@ export const LiveMapView: React.FC<LiveMapViewProps> = ({
 
             {selectedReport.forensics.status !== 'FLAGGED_SYNTHETIC' && (
               <div className="flex items-center gap-2 px-3.5 pb-3.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const w =
+                      SEED_WARDS.find((x) => x.id === selectedReport.wardId) ?? activeWard;
+                    openWhatsAppShare(
+                      selectedReport,
+                      {
+                        wardLabel: `${selectedReport.municipalityCode} Ward ${selectedReport.wardNumber} (${selectedReport.suburb})`,
+                        councillorName: w.councillor.name,
+                      },
+                      w.councillor.whatsappEscalation
+                    );
+                  }}
+                  title="Share report to WhatsApp"
+                  className="min-h-[34px] px-2.5 border border-slate-300 dark:border-white/20 text-[11px] font-semibold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Share</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => onCorroborate(selectedReport.id)}

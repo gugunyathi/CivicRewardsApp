@@ -5,15 +5,18 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
   FileCheck2,
+  MessageCircle,
   ShieldAlert,
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
 import { SEED_WARDS } from '../data/civicSeedData';
 import type { CivicReport, ReportStatus, WardRecord } from '../types/civic';
+import { openWhatsAppShare } from '../utils/share';
+import { EscalationPanel } from './EscalationPanel';
 import { MiniMapPreview } from './MiniMapPreview';
+import { SlaCountdown } from './SlaCountdown';
 import { SmartImage } from './SmartImage';
 
 interface CouncillorDeskViewProps {
@@ -208,19 +211,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                     )}
                   </div>
 
-                  <div
-                    className={`text-xs font-mono tabular-nums flex items-center gap-1 ${
-                      slaBreached
-                        ? 'text-red-600 dark:text-red-400 font-bold'
-                        : 'text-slate-500 dark:text-slate-400'
-                    }`}
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>
-                      SLA {report.slaElapsedHours}h/{report.slaDeadlineHours}h
-                      {slaBreached ? ' BREACHED' : ''}
-                    </span>
-                  </div>
+                  <SlaCountdown report={report} />
                 </div>
               </div>
 
@@ -252,6 +243,14 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Guided escalation path */}
+              <EscalationPanel
+                report={report}
+                ward={wardMeta ?? activeWard}
+                onAttachRef={onAttachRef}
+                onSendSlaReminder={onSendSlaReminder}
+              />
 
               {/* Progress Stepper */}
               {report.status !== 'Blocked by AI Forensics' && (
@@ -315,6 +314,26 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                     </button>
                   )}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const w = wardMeta ?? activeWard;
+                    openWhatsAppShare(
+                      report,
+                      {
+                        wardLabel: `${report.municipalityCode} W${report.wardNumber} (${report.suburb})`,
+                        councillorName: w.councillor.name,
+                      },
+                      w.councillor.whatsappEscalation
+                    );
+                  }}
+                  title="Share report to WhatsApp"
+                  className="min-h-[36px] px-3 border border-slate-200 dark:border-white/20 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>WhatsApp</span>
+                </button>
 
                 {report.status !== 'Blocked by AI Forensics' && report.status !== 'Resolved' && (
                   <button

@@ -5,13 +5,18 @@ import {
   ChevronRight,
   FileWarning,
   MapPin,
+  MessageCircle,
   Plus,
   ShieldAlert,
   ShieldCheck,
   Users,
 } from 'lucide-react';
+import { SEED_WARDS } from '../data/civicSeedData';
 import type { CivicReport, WardRecord } from '../types/civic';
+import { openWhatsAppShare } from '../utils/share';
 import { MiniMapPreview } from './MiniMapPreview';
+import { RefBadge } from './RefBadge';
+import { SlaCountdown } from './SlaCountdown';
 import { SmartImage } from './SmartImage';
 
 interface WardFeedViewProps {
@@ -164,6 +169,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = ({
           {pageItems.map((report) => {
             const isBlocked = report.forensics.status === 'FLAGGED_SYNTHETIC';
             const isVerified = report.forensics.status === 'VERIFIED';
+            const ward = SEED_WARDS.find((w) => w.id === report.wardId);
 
             return (
               <article
@@ -222,6 +228,11 @@ export const WardFeedView: React.FC<WardFeedViewProps> = ({
                       {report.forensics.timestampLabel} · {report.forensics.gpsMatchLabel}
                     </div>
 
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <RefBadge value={report.municipalRef} />
+                      <SlaCountdown report={report} />
+                    </div>
+
                     {/* Free mini map pinpointing the fault location */}
                     <div className="flex gap-2.5 items-stretch pt-1">
                       <MiniMapPreview
@@ -258,6 +269,26 @@ export const WardFeedView: React.FC<WardFeedViewProps> = ({
 
                     {!isBlocked && (
                       <div className="flex items-center gap-2">
+                        {ward && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openWhatsAppShare(
+                                report,
+                                {
+                                  wardLabel: `${report.municipalityCode} Ward ${report.wardNumber} (${report.suburb})`,
+                                  councillorName: ward.councillor.name,
+                                },
+                                ward.councillor.whatsappEscalation
+                              )
+                            }
+                            title="Share report to WhatsApp"
+                            className="min-h-[34px] px-2.5 border border-slate-200 dark:border-white/20 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Share</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onCorroborateReport(report.id)}

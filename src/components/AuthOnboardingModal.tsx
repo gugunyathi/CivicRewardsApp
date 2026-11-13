@@ -4,7 +4,10 @@ import {
   ArrowRight,
   CheckCircle2,
   Compass,
+  KeyRound,
+  Loader2,
   LocateFixed,
+  LogOut,
   Mail,
   MapPin,
   MessageCircle,
@@ -16,6 +19,13 @@ import {
 } from 'lucide-react';
 import { SEED_WARDS } from '../data/civicSeedData';
 import type { AuthChannel, UserProfile, WardRecord } from '../types/civic';
+import {
+  authClient,
+  loadGoogleIdentity,
+  renderGoogleButton,
+  type AuthConfig,
+  type SessionProfile,
+} from '../utils/authClient';
 import { resolveWardByCoordinates, resolveWardByQuery } from '../utils/wardResolver';
 
 interface AuthOnboardingModalProps {
@@ -25,6 +35,8 @@ interface AuthOnboardingModalProps {
   activeWard: WardRecord;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onSelectWard: (wardId: string, bindAsHome: boolean) => void;
+  onAuthSuccess: (profile: SessionProfile) => void;
+  onSignOut: () => void;
 }
 
 const QUICK_METRO_CHIPS = [
@@ -42,15 +54,24 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
   activeWard,
   onUpdateProfile,
   onSelectWard,
+  onAuthSuccess,
+  onSignOut,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [channel, setChannel] = useState<AuthChannel>(user.authChannel);
   const [nameInput, setNameInput] = useState(user.name);
   const [emailInput, setEmailInput] = useState(user.emailOrHandle);
   const [mobileInput, setMobileInput] = useState(user.mobileZa);
+
+  // Real session state
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const googleBtnRef = useRef<HTMLDivElement | null>(null);
 
   const [addressQuery, setAddressQuery] = useState('');
   const [detectStatus, setDetectStatus] = useState<string | null>(null);
@@ -60,15 +81,53 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
+      setStep(user.signedIn ? 3 : 1);
       setOtpSent(false);
+      setOtpCode('');
+      setDevCode(null);
+      setAuthError(null);
       setAuthNotice(null);
       setDetectStatus(null);
+      authClient.config().then(setAuthConfig).catch(() => setAuthConfig(null));
     }
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Render the Google Identity button once config + container are ready
+  useEffect(() => {
+    if (!isOpen || step !== 2 || channel !== 'google' || !authConfig?.googleClientId) return;
+    if (!googleBtnRef.current || googleBtnRef.current.childElementCount > 0) return;
+    let cancelled = false;
+    loadGoogleIdentity()
+      .then(() => {
+        if (cancelled || !googleBtnRef.current) return;
+        googleBtnRef.current.innerHTML = '';
+        renderGoogleButton(googleBtnRef.current, authConfig.googleClientId!, async (idToken) => {
+          setAuthBusy(true);
+          setAuthError(null);
+          try {
+            const { profile } = await authClient.google(idToken);
+            onAuthSuccess(profile);
+            setAuthNotice(`Signed in as ${profile.name} via Google.`);
+            advanceSoon(3, 300);
+          } catch (err) {
+            setAuthError(err instanceof Error ? err.message : 'Google sign-in failed.');
+          } finally {
+            setAuthBusy(false);
+          }
+        });
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setAuthError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, step, channel, authConfig?.googleClientId]);
 
   if (!isOpen) return null;
 
@@ -77,47 +136,75 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
     timerRef.current = window.setTimeout(() => setStep(targetStep), ms);
   };
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (channel === 'whatsapp' && !otpSent) {
+  const handleRequestOtp = async () => {
+    setAuthBusy(true);
+    setAuthError(null);
+    setDevCode(null);
+    try {
+      const res = await authClient.requestOtp(mobileInput, nameInput);
       setOtpSent(true);
-      setAuthNotice(`WhatsApp 6-digit OTP sent to ${mobileInput || '+27 82 419 8820'} (demo: any 4+ digits).`);
-      return;
+      if (res.devCode) setDevCode(res.devCode);
+      setAuthNotice(
+        res.devCode
+          ? `Dev mode: no WhatsApp provider configured — use code ${res.devCode}.`
+          : `WhatsApp code sent to ${mobileInput}. Valid 10 minutes.`
+      );
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Could not send code.');
+    } finally {
+      setAuthBusy(false);
     }
-    if (channel === 'whatsapp' && otpSent && otpCode.trim().length < 4) {
-      setAuthNotice('Enter the 6-digit WhatsApp verification code.');
-      return;
-    }
-
-    onUpdateProfile({
-      name: nameInput.trim() || 'Thabo Mokoena',
-      emailOrHandle: emailInput.trim() || 'thabo@civicpulse.za',
-      mobileZa: mobileInput.trim() || '+27 82 419 8820',
-      authChannel: channel,
-      signedIn: true,
-    });
-    setAuthNotice(`Verified via ${channel === 'email_za' ? 'Email +27' : channel.toUpperCase()}.`);
-    advanceSoon(3, 240);
   };
 
-  const handleQuickOAuth = (selectedChannel: 'google' | 'telegram') => {
-    setChannel(selectedChannel);
-    const updatedName = selectedChannel === 'google' ? nameInput || 'Gugu Ndlovu' : nameInput || 'Sipho Dlamini';
-    const updatedHandle = selectedChannel === 'google' ? 'gugu@ribbonprotocol.org' : '@sipho_fourways';
-    setNameInput(updatedName);
-    setEmailInput(updatedHandle);
-    onUpdateProfile({
-      name: updatedName,
-      emailOrHandle: updatedHandle,
-      authChannel: selectedChannel,
-      signedIn: true,
-    });
-    setAuthNotice(
-      selectedChannel === 'google'
-        ? 'Google OAuth linked to your Ward profile.'
-        : 'Telegram @CivicPulseZABot connected.'
-    );
-    advanceSoon(3, 260);
+  const handleVerifyOtp = async () => {
+    if (otpCode.trim().length < 4) {
+      setAuthError('Enter the 6-digit WhatsApp verification code.');
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const { profile } = await authClient.verifyOtp(mobileInput, otpCode.trim(), nameInput);
+      onAuthSuccess(profile);
+      setAuthNotice(`Verified ${profile.mobileZa} via WhatsApp OTP.`);
+      advanceSoon(3, 300);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Verification failed.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleDemoSignIn = async () => {
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const { profile } = await authClient.demo(
+        nameInput.trim() || 'Demo Resident',
+        mobileInput.trim(),
+        emailInput.trim() || 'demo@civicpulse.local',
+        channel
+      );
+      onAuthSuccess(profile);
+      setAuthNotice('Demo session created (explicitly labeled — no OAuth keys needed).');
+      advanceSoon(3, 300);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Demo sign-in failed.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await authClient.logout();
+    } catch {
+      // ignore — local state still clears
+    }
+    onSignOut();
+    setOtpSent(false);
+    setOtpCode('');
+    setAuthNotice('Signed out. Session cookie cleared.');
   };
 
   const handleLiveGps = () => {
@@ -159,7 +246,7 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
@@ -174,7 +261,7 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
               </div>
               <h2 id="auth-modal-title" className="font-display text-base font-bold text-slate-900 dark:text-white truncate">
                 {step === 1 && 'Where is your municipal ward?'}
-                {step === 2 && 'Choose how to verify & sign in'}
+                {step === 2 && 'Verify & sign in'}
                 {step === 3 && 'Your CivicPulse profile summary'}
               </h2>
             </div>
@@ -339,135 +426,256 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
           )}
 
           {step === 2 && (
-            <div className="flex-1 flex flex-col justify-between gap-2.5 min-h-0">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleQuickOAuth('google')}
-                  className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
-                    channel === 'google'
-                      ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                      : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
-                  }`}
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Google</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickOAuth('telegram')}
-                  className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
-                    channel === 'telegram'
-                      ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                      : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
-                  }`}
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Telegram</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChannel('whatsapp');
-                    setOtpSent(false);
-                  }}
-                  className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
-                    channel === 'whatsapp'
-                      ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                      : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
-                  }`}
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setChannel('email_za')}
-                  className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
-                    channel === 'email_za'
-                      ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                      : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
-                  }`}
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Email +27</span>
-                </button>
-              </div>
-
-              <form onSubmit={handleAuthSubmit} className="space-y-2.5 flex-1 flex flex-col justify-center">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
-                      Resident Name
-                    </label>
-                    <input
-                      type="text"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm text-slate-900 dark:text-white"
-                    />
+            <div className="flex-1 flex flex-col justify-between gap-2.5 min-h-0 overflow-y-auto">
+              {user.signedIn ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+                  <div className="w-12 h-12 bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
-                      SA Mobile (+27)
-                    </label>
-                    <input
-                      type="tel"
-                      value={mobileInput}
-                      onChange={(e) => setMobileInput(e.target.value)}
-                      className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm font-mono text-slate-900 dark:text-white"
-                    />
+                    <div className="text-sm font-bold text-slate-900 dark:text-white">
+                      Signed in as {user.name}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                      {user.authChannel.toUpperCase()} · {user.mobileZa || user.emailOrHandle} · 30-day session
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="min-h-[40px] px-4 border border-slate-300 dark:border-white/25 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign out</span>
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setChannel('google')}
+                      className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
+                        channel === 'google'
+                          ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                          : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Google</span>
+                    </button>
 
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
-                    Email or Telegram Handle
-                  </label>
-                  <input
-                    type="text"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm text-slate-900 dark:text-white"
-                  />
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => setChannel('telegram')}
+                      className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
+                        channel === 'telegram'
+                          ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                          : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>Telegram</span>
+                    </button>
 
-                {channel === 'whatsapp' && otpSent && (
-                  <div>
-                    <label className="block text-[11px] font-medium text-sky-600 dark:text-sky-400 mb-0.5">
-                      WhatsApp 6-Digit OTP
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      placeholder="482910"
-                      className="w-full min-h-[40px] px-3 border border-sky-500 bg-white dark:bg-[#05070B] text-sm font-mono tracking-widest text-slate-900 dark:text-white"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChannel('whatsapp');
+                        setOtpSent(false);
+                      }}
+                      className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
+                        channel === 'whatsapp'
+                          ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                          : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>WhatsApp</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setChannel('email_za')}
+                      className={`min-h-[42px] px-2 border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
+                        channel === 'email_za'
+                          ? 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                          : 'border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>Email +27</span>
+                    </button>
                   </div>
-                )}
 
-                {authNotice && (
-                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-300">
-                    {authNotice}
-                  </div>
-                )}
+                  {/* GOOGLE OAUTH */}
+                  {channel === 'google' && (
+                    <div className="space-y-2.5 flex-1 flex flex-col justify-center items-center text-center">
+                      {authConfig?.googleClientId ? (
+                        <>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
+                            Continue with your Google account — verified server-side, 30-day session.
+                          </p>
+                          <div ref={googleBtnRef} className="min-h-[44px] flex justify-center" />
+                          {authBusy && (
+                            <span className="text-xs text-slate-500 flex items-center gap-1.5">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Verifying…
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-3 border border-amber-400/50 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-200 max-w-sm space-y-1.5">
+                          <div className="font-bold">Google sign-in not configured</div>
+                          <p>
+                            Set <span className="font-mono">GOOGLE_CLIENT_ID</span> (Google Cloud OAuth
+                            web client) and restart the server to enable real Google OAuth. WhatsApp OTP
+                            and demo sign-in work without it.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                <button
-                  type="submit"
-                  className="w-full min-h-[42px] bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold cursor-pointer"
-                >
-                  {channel === 'whatsapp' && !otpSent
-                    ? 'Send WhatsApp OTP'
-                    : channel === 'whatsapp' && otpSent
-                      ? 'Verify Code & Continue'
-                      : 'Save & Review Summary →'}
-                </button>
-              </form>
+                  {/* WHATSAPP OTP */}
+                  {channel === 'whatsapp' && (
+                    <div className="space-y-2.5 flex-1 flex flex-col justify-center">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
+                            Resident Name
+                          </label>
+                          <input
+                            type="text"
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value)}
+                            className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm text-slate-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
+                            SA Mobile (+27)
+                          </label>
+                          <input
+                            type="tel"
+                            value={mobileInput}
+                            onChange={(e) => setMobileInput(e.target.value)}
+                            placeholder="+27 82 123 4567"
+                            className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm font-mono text-slate-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+
+                      {otpSent && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-sky-600 dark:text-sky-400 mb-0.5">
+                            WhatsApp 6-Digit Code
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                            placeholder="482910"
+                            className="w-full min-h-[40px] px-3 border border-sky-500 bg-white dark:bg-[#05070B] text-sm font-mono tracking-widest text-slate-900 dark:text-white"
+                          />
+                          {devCode && (
+                            <p className="mt-1 font-mono text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <KeyRound className="w-3 h-3" /> Dev code: {devCode}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={authBusy}
+                        onClick={otpSent ? handleVerifyOtp : handleRequestOtp}
+                        className="w-full min-h-[42px] bg-slate-900 dark:bg-white text-white dark:text-slate-950 disabled:opacity-50 text-xs font-semibold cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {authBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        <span>{otpSent ? 'Verify Code & Continue' : 'Send WhatsApp Code'}</span>
+                      </button>
+                      {otpSent && (
+                        <button
+                          type="button"
+                          disabled={authBusy}
+                          onClick={handleRequestOtp}
+                          className="text-[11px] text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                        >
+                          Resend code
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TELEGRAM / EMAIL → explicit demo session */}
+                  {(channel === 'telegram' || channel === 'email_za') && (
+                    <div className="space-y-2.5 flex-1 flex flex-col justify-center">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
+                            Resident Name
+                          </label>
+                          <input
+                            type="text"
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value)}
+                            className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm text-slate-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
+                            {channel === 'telegram' ? 'Telegram Handle' : 'Email Address'}
+                          </label>
+                          <input
+                            type="text"
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm text-slate-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">
+                          SA Mobile (+27, optional)
+                        </label>
+                        <input
+                          type="tel"
+                          value={mobileInput}
+                          onChange={(e) => setMobileInput(e.target.value)}
+                          className="w-full min-h-[40px] px-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm font-mono text-slate-900 dark:text-white"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={authBusy || authConfig?.demoLoginEnabled === false}
+                        onClick={handleDemoSignIn}
+                        className="w-full min-h-[42px] bg-slate-900 dark:bg-white text-white dark:text-slate-950 disabled:opacity-50 text-xs font-semibold cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {authBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        <span>Continue with Demo Session</span>
+                      </button>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {channel === 'telegram' ? 'Telegram' : 'Email'} verification lands in a later
+                        phase — this creates an explicitly-labeled demo session so you can evaluate the
+                        full flow today.
+                      </p>
+                    </div>
+                  )}
+
+                  {authError && (
+                    <div className="p-2.5 bg-red-500/10 border border-red-500/40 text-xs text-red-700 dark:text-red-300 shrink-0">
+                      {authError}
+                    </div>
+                  )}
+                  {authNotice && !authError && (
+                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-300 shrink-0">
+                      {authNotice}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -514,12 +722,13 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
                     <div className="min-w-0">
                       <div className="font-mono text-[10px] text-slate-400">
                         02 · CITIZEN IDENTITY ({user.authChannel.toUpperCase()})
+                        {user.signedIn ? ' · SESSION ACTIVE' : ' · NOT SIGNED IN'}
                       </div>
                       <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                         {user.name} · {user.emailOrHandle}
                       </div>
                       <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                        {user.mobileZa} · {user.tier}
+                        {user.mobileZa || 'no mobile'} · {user.tier}
                       </div>
                     </div>
                   </div>

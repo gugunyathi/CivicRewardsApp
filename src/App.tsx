@@ -7,6 +7,7 @@ import { CommandCenterView } from './components/CommandCenterView';
 import { CouncillorDeskView } from './components/CouncillorDeskView';
 import { DirectoryView, RewardsView } from './components/DirectoryRewardsView';
 import { FloatingMenu } from './components/FloatingMenu';
+import { authClient, type SessionProfile } from './utils/authClient';
 import { LiveMapView } from './components/LiveMapView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ReportFormModal } from './components/ReportFormModal';
@@ -49,16 +50,16 @@ export default function App() {
   const [emergencyMode, setEmergencyMode] = useState(false);
 
   const [user, setUser] = useState<UserProfile>({
-    name: 'Gugu Ndlovu',
-    emailOrHandle: 'gugu@ribbonprotocol.org',
-    mobileZa: '+27 82 419 8820',
+    name: 'Guest Resident',
+    emailOrHandle: '',
+    mobileZa: '',
     authChannel: 'google',
-    signedIn: true,
+    signedIn: false,
     homeWardId: 'CoJ-115',
     activeWardId: 'CoJ-115',
     awayFromHome: false,
-    credits: 240,
-    tier: 'Ward Steward · Gold',
+    credits: 0,
+    tier: 'New Resident',
   });
 
   const [reports, setReports] = useState<CivicReport[]>(SEED_REPORTS);
@@ -80,10 +81,50 @@ export default function App() {
   }, [darkMode]);
 
   useEffect(() => {
+    authClient
+      .me()
+      .then(({ profile }) => handleAuthSuccess(profile))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!toastMessage) return;
     const timer = setTimeout(() => setToastMessage(null), 4500);
     return () => clearTimeout(timer);
   }, [toastMessage]);
+
+  const handleAuthSuccess = (profile: SessionProfile) => {
+    try {
+      localStorage.setItem('civic_profile', JSON.stringify(profile));
+    } catch {
+      // private mode -- session cookie still persists login
+    }
+    setUser((prev) => ({
+      ...prev,
+      name: profile.name,
+      emailOrHandle: profile.emailOrHandle,
+      mobileZa: profile.mobileZa || prev.mobileZa,
+      authChannel: profile.channel,
+      signedIn: true,
+    }));
+  };
+
+  const handleSignOut = () => {
+    try {
+      localStorage.removeItem('civic_profile');
+    } catch {
+      // ignore
+    }
+    setUser((prev) => ({ ...prev, signedIn: false }));
+    setToastMessage('Signed out.');
+  };
+
+  const requireAuth = (action: string): boolean => {
+    if (user.signedIn) return true;
+    setAuthModalOpen(true);
+    setToastMessage('Sign in to ' + action + '.');
+    return false;
+  };
 
   const activeWard =
     SEED_WARDS.find((w) => w.id === user.activeWardId) ?? SEED_WARDS[0];
@@ -130,6 +171,7 @@ export default function App() {
   };
 
   const handleSubmitNewReport = (newReport: CivicReport, rewardPoints: number) => {
+    if (!requireAuth('log a fault report')) return;
     setReports((prev) => [newReport, ...prev]);
     pushReward(
       newReport.forensics.status === 'VERIFIED' ? 'Verified Live Capture Report' : 'Civic Fault Logged',
@@ -140,6 +182,7 @@ export default function App() {
   };
 
   const handleCorroborateReport = (reportId: string) => {
+    if (!requireAuth('link your household')) return;
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId
@@ -156,6 +199,7 @@ export default function App() {
   };
 
   const handleVerifyResolution = (reportId: string) => {
+    if (!requireAuth('verify a resolution')) return;
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId
@@ -399,6 +443,7 @@ export default function App() {
               user={user}
               transactions={transactions}
               onRedeemOffer={(_offerId, cost, title) => {
+                if (!requireAuth('redeem rewards')) return;
                 pushReward('Cashed Out · ' + title, `Redeemed by ${user.mobileZa}`, cost, 'redeem');
               }}
             />
@@ -424,6 +469,8 @@ export default function App() {
               }}
               onOpenRewards={() => setActiveView('rewards')}
               onVerifyResolution={handleVerifyResolution}
+              onAttachRef={handleAttachRef}
+              onSendSlaReminder={handleSendSlaReminder}
             />
           )}
         </div>
@@ -494,6 +541,8 @@ export default function App() {
         activeWard={activeWard}
         onUpdateProfile={(updates) => setUser((prev) => ({ ...prev, ...updates }))}
         onSelectWard={handleSelectWard}
+        onAuthSuccess={handleAuthSuccess}
+        onSignOut={handleSignOut}
       />
 
       <ReportFormModal
@@ -506,6 +555,11 @@ export default function App() {
         onClose={() => setReportModalOpen(false)}
         onSubmitNewReport={handleSubmitNewReport}
         onCorroborateExisting={handleCorroborateReport}
+        signedIn={user.signedIn}
+        onRequireAuth={() => {
+          setAuthModalOpen(true);
+          setToastMessage('Sign in to submit your report -- your draft is kept.');
+        }}
       />
 
       <CivicAssistantDrawer

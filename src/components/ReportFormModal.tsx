@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import samplePipeBurst from '../assets/images/evidence_pipe_burst_1794565148729.jpg';
 import sampleSinkhole from '../assets/images/evidence_synthetic_sinkhole_1794565149966.jpg';
-import { SERVICE_CATEGORIES } from '../data/civicSeedData';
+import { MUNICIPALITIES, SERVICE_CATEGORIES } from '../data/civicSeedData';
 import type {
   CivicReport,
   ExifMetadataPayload,
@@ -41,6 +41,7 @@ import type {
   WardRecord,
 } from '../types/civic';
 import { getDepotForCategory, haversineDistanceMeters } from '../utils/wardResolver';
+import { generateMunicipalRef, getRefGuidance } from '../utils/municipalRefs';
 import { BASEMAP_ORDER, BASEMAPS, type BasemapId } from '../utils/mapTiles';
 import { InteractiveMap } from './InteractiveMap';
 
@@ -54,6 +55,8 @@ interface ReportFormModalProps {
   onClose: () => void;
   onSubmitNewReport: (report: CivicReport, rewardPoints: number) => void;
   onCorroborateExisting: (reportId: string) => void;
+  signedIn: boolean;
+  onRequireAuth: () => void;
 }
 
 const SAMPLE_TEST_MEDIA = [
@@ -289,6 +292,8 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   onClose,
   onSubmitNewReport,
   onCorroborateExisting,
+  signedIn,
+  onRequireAuth,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [categoryId, setCategoryId] = useState<ServiceCategoryId>(initialCategoryId);
@@ -303,6 +308,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   const [severity, setSeverity] = useState<SeverityLevel>(emergencyMode ? 'CRITICAL' : 'MODERATE');
   const [isEmergency, setIsEmergency] = useState(emergencyMode);
   const [isLocatingGps, setIsLocatingGps] = useState(false);
+  const [showRefGuide, setShowRefGuide] = useState(false);
   const [pickerBasemap, setPickerBasemap] = useState<BasemapId | undefined>(undefined);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -346,6 +352,11 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
   const currentCategory = SERVICE_CATEGORIES.find((c) => c.id === categoryId) ?? SERVICE_CATEGORIES[0];
   const assignedDepot = getDepotForCategory(activeWard, categoryId);
+  const depotEntity =
+    MUNICIPALITIES[activeWard.municipalityCode].entities.find((e) =>
+      assignedDepot.toLowerCase().includes(e.name.split(' ')[0].toLowerCase())
+    ) ?? MUNICIPALITIES[activeWard.municipalityCode].entities[0];
+  const refGuidance = getRefGuidance(assignedDepot, depotEntity.handle, depotEntity.slaHours);
 
   const nearbyDuplicate = existingReports.find(
     (r) =>
@@ -561,6 +572,10 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
   const handleSubmitFinal = () => {
     if (isBlockedSynthetic) return;
+    if (!signedIn) {
+      onRequireAuth();
+      return;
+    }
 
     const rewardPoints = forensics?.authenticityStatus === 'VERIFIED' ? 50 : previewUrl ? 25 : 15;
     const newId = `CP-2026-${Math.floor(1050 + Math.random() * 8900)}`;
@@ -580,7 +595,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       address: address.trim() || `${activeWard.corridors[0] || 'Main Rd'}, ${activeWard.suburbs[0]}`,
       lat: pinLat,
       lng: pinLng,
-      municipalRef: isEmergency ? municipalRef.trim() || 'SOS-BYPASS' : municipalRef.trim() || null,
+      municipalRef: isEmergency ? municipalRef.trim() || 'SOS-BYPASS' : municipalRef.trim() || generateMunicipalRef(activeWard.municipalityCode, categoryId),
       status: isEmergency ? 'Escalated to Depot' : 'Logged',
       severity,
       isEmergency,
@@ -1132,15 +1147,42 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 mb-0.5">
-                    Municipal Ref # {isEmergency ? '(Bypassed SOS)' : '(Optional)'}
+                    Municipal Ref # {isEmergency ? '(Bypassed SOS)' : '(Auto-generated if blank)'}
                   </label>
+                  <div className="flex gap-1.5">
                   <input
                     type="text"
                     value={municipalRef}
                     onChange={(e) => setMunicipalRef(e.target.value)}
                     placeholder={`e.g. ${currentCategory.refHint}`}
-                    className="w-full min-h-[38px] px-2.5 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-xs font-mono text-slate-900 dark:text-white"
+                    className="flex-1 min-h-[38px] px-2.5 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-xs font-mono text-slate-900 dark:text-white"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setMunicipalRef(generateMunicipalRef(activeWard.municipalityCode, categoryId))}
+                    title="Generate a provisional ref in the depot format"
+                    className="shrink-0 min-h-[38px] px-2.5 border border-sky-500 text-sky-600 dark:text-sky-400 text-[11px] font-semibold cursor-pointer"
+                  >
+                    Generate
+                  </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowRefGuide((v) => !v)}
+                    className="mt-1 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                  >
+                    {showRefGuide ? 'Hide ref guide' : 'How do I get my official ref?'}
+                  </button>
+                  {showRefGuide && (
+                    <ol className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 space-y-1 list-decimal list-inside bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-2.5">
+                      {refGuidance.steps.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                      <li className="font-mono text-[10px] text-slate-400">
+                        {refGuidance.depot} - {refGuidance.entityHandle} - {refGuidance.slaHours}h SLA
+                      </li>
+                    </ol>
+                  )}
                 </div>
               </div>
             </div>

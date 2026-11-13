@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { registerAuthRoutes } from './server-auth';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +34,7 @@ Return ONLY valid JSON matching the requested schema.`;
 async function createServer() {
   const app = express();
   app.use(express.json({ limit: '25mb' }));
+  registerAuthRoutes(app);
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, hasGeminiKey: Boolean(process.env.GEMINI_API_KEY) });

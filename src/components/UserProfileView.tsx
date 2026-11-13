@@ -9,6 +9,7 @@ import {
   Droplets,
   FileCheck2,
   Gift,
+  MessageCircle,
   Pencil,
   Plus,
   Receipt,
@@ -18,8 +19,11 @@ import {
   User,
   Zap,
 } from 'lucide-react';
-import { SEED_WARD_TOWN_BENCHMARKS } from '../data/civicSeedData';
+import { SEED_WARD_TOWN_BENCHMARKS, SEED_WARDS } from '../data/civicSeedData';
 import { SmartImage } from './SmartImage';
+import { EscalationPanel } from './EscalationPanel';
+import { SlaCountdown } from './SlaCountdown';
+import { openWhatsAppShare } from '../utils/share';
 import type {
   CivicReport,
   MonthlyMunicipalBill,
@@ -39,6 +43,8 @@ interface UserProfileViewProps {
   onOpenReportModal: () => void;
   onOpenRewards: () => void;
   onVerifyResolution: (reportId: string) => void;
+  onAttachRef: (reportId: string, refCode: string) => void;
+  onSendSlaReminder: (reportId: string) => void;
 }
 
 type ProfileTab = 'reports' | 'points' | 'bills' | 'compare';
@@ -96,6 +102,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   onOpenReportModal,
   onOpenRewards,
   onVerifyResolution,
+  onAttachRef,
+  onSendSlaReminder,
 }) => {
   const [tab, setTab] = useState<ProfileTab>('reports');
 
@@ -394,6 +402,34 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     categoryId={rep.categoryId}
                     label={`${rep.departmentLabel} · ${rep.suburb}`}
                     className="h-28 w-full"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <SlaCountdown report={rep} />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const w = SEED_WARDS.find((x) => x.id === rep.wardId) ?? activeWard;
+                        openWhatsAppShare(
+                          rep,
+                          {
+                            wardLabel: `${rep.municipalityCode} Ward ${rep.wardNumber} (${rep.suburb})`,
+                            councillorName: w.councillor.name,
+                          },
+                          w.councillor.whatsappEscalation
+                        );
+                      }}
+                      title="Share report to WhatsApp"
+                      className="min-h-[32px] px-2.5 border border-slate-200 dark:border-white/20 text-[11px] font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Share</span>
+                    </button>
+                  </div>
+                  <EscalationPanel
+                    report={rep}
+                    ward={SEED_WARDS.find((w) => w.id === rep.wardId) ?? activeWard}
+                    onAttachRef={onAttachRef}
+                    onSendSlaReminder={onSendSlaReminder}
                   />
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[11px] font-mono">
