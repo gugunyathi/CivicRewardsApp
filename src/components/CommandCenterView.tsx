@@ -88,7 +88,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
   const [noticeIdx, setNoticeIdx] = useState(0);
   const autoTimerRef = useRef<number | null>(null);
 
-  const metroInfo = MUNICIPALITIES[activeWard.municipalityCode];
+  const metroInfo = MUNICIPALITIES[activeWard.municipalityCode] ?? MUNICIPALITIES['CoJ'];
 
   const handleCategoryTrigger = (catId: ServiceCategoryId) => {
     if (catId === 'accounts' || catId === 'anticorruption' || catId === 'notices') {
@@ -157,7 +157,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
               WARD {activeWard.wardNumber} · {activeWard.municipalityCode}
             </span>
             <span aria-hidden="true">/</span>
-            <span className="truncate">{activeWard.suburbs[0]}</span>
+            <span className="truncate">{activeWard.suburbs?.[0]}</span>
             <span aria-hidden="true">/</span>
             <span>{user.awayFromHome ? 'AWAY GPS' : 'HOME'}</span>
           </div>

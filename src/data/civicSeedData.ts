@@ -530,7 +530,7 @@ export const SEED_REPORTS: CivicReport[] = [
     wardId: 'CoJ-101',
     municipalityCode: 'CoJ',
     wardNumber: 101,
-    suburbs: undefined as never,
+    suburbs: ['North Riding'],
     suburb: 'North Riding',
     categoryId: 'electricity',
     departmentLabel: 'Electricity & Power',

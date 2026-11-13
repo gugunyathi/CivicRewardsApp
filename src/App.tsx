@@ -107,6 +107,7 @@ export default function App() {
   }, [toastMessage]);
 
   const handleAuthSuccess = (profile: SessionProfile) => {
+    if (!profile || !profile.name) return; // Guard: skip bad/empty profiles
     try {
       localStorage.setItem('civic_profile', JSON.stringify(profile));
     } catch {
@@ -114,10 +115,10 @@ export default function App() {
     }
     setUser((prev) => ({
       ...prev,
-      name: profile.name,
-      emailOrHandle: profile.emailOrHandle,
+      name: profile.name || prev.name,
+      emailOrHandle: profile.emailOrHandle || prev.emailOrHandle,
       mobileZa: profile.mobileZa || prev.mobileZa,
-      authChannel: profile.channel,
+      authChannel: profile.channel || prev.authChannel,
       signedIn: true,
     }));
   };
@@ -140,7 +141,7 @@ export default function App() {
   };
 
   const activeWard =
-    SEED_WARDS.find((w) => w.id === user.activeWardId) ?? SEED_WARDS[0];
+    SEED_WARDS.find((w) => w.id === user.activeWardId) ?? SEED_WARDS[0]!;
 
   const currentPageIdx = PAGE_ORDER.findIndex((p) => p.id === activeView);
   const goToPrevPage = () => {

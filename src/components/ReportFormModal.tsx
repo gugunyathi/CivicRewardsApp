@@ -299,7 +299,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   const [categoryId, setCategoryId] = useState<ServiceCategoryId>(initialCategoryId);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [address, setAddress] = useState(`${activeWard.corridors[0] || 'Main Road'}, ${activeWard.suburbs[0]}`);
+  const [address, setAddress] = useState(`${activeWard.corridors?.[0] || 'Main Road'}, ${activeWard.suburbs?.[0] || ''}`);
   const [pinCoords, setPinCoords] = useState<{ lat: number; lng: number }>({
     lat: activeWard.lat,
     lng: activeWard.lng,
@@ -335,7 +335,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       setExifData(null);
       setForensics(null);
       setAnalysisError(null);
-      setAddress(`${activeWard.corridors[0] || 'Main Road'}, ${activeWard.suburbs[0]}`);
+      setAddress(`${activeWard.corridors?.[0] || 'Main Road'}, ${activeWard.suburbs?.[0] || ''}`);
       setPinCoords({ lat: activeWard.lat, lng: activeWard.lng });
       setIsEmergency(emergencyMode);
       setSeverity(emergencyMode ? 'CRITICAL' : 'MODERATE');
@@ -352,10 +352,11 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
   const currentCategory = SERVICE_CATEGORIES.find((c) => c.id === categoryId) ?? SERVICE_CATEGORIES[0];
   const assignedDepot = getDepotForCategory(activeWard, categoryId);
+  const _municipalityData = MUNICIPALITIES[activeWard.municipalityCode] ?? MUNICIPALITIES['CoJ'];
   const depotEntity =
-    MUNICIPALITIES[activeWard.municipalityCode].entities.find((e) =>
+    _municipalityData.entities.find((e) =>
       assignedDepot.toLowerCase().includes(e.name.split(' ')[0].toLowerCase())
-    ) ?? MUNICIPALITIES[activeWard.municipalityCode].entities[0];
+    ) ?? _municipalityData.entities[0];
   const refGuidance = getRefGuidance(assignedDepot, depotEntity.handle, depotEntity.slaHours);
 
   const nearbyDuplicate = existingReports.find(

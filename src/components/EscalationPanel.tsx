@@ -37,10 +37,11 @@ export const EscalationPanel: React.FC<EscalationPanelProps> = ({
     report.status === 'Resolved' ||
     report.escalationLog.some((e) => /sla follow-up|escalat/i.test(e));
 
+  const _mData = MUNICIPALITIES[ward.municipalityCode] ?? MUNICIPALITIES['CoJ'];
   const entity =
-    MUNICIPALITIES[ward.municipalityCode].entities.find((e) =>
+    _mData.entities.find((e) =>
       report.assignedDepot.toLowerCase().includes(e.name.split(' ')[0].toLowerCase())
-    ) ?? MUNICIPALITIES[ward.municipalityCode].entities[0];
+    ) ?? _mData.entities[0];
   const guidance = getRefGuidance(report.assignedDepot, entity.handle, entity.slaHours);
 
   const shareCtx = {
