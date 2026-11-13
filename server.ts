@@ -155,7 +155,7 @@ async function createServer() {
       }
 
       const ai = getAiClient();
-      const systemInstruction = `You are CivicPulse AI, a 2027 South African Municipal Civic Assistant.
+      const systemInstruction = `You are CivicRewards AI, a 2027 South African Municipal Civic Assistant.
 You help residents across City of Johannesburg (CoJ), City of Cape Town (CoCT), City of Tshwane (CoT), and eThekwini Metropolitan Municipality.
 You know South African municipal bylaws, depot escalation rules, municipal reference formats (e.g., City Power CPWEB5012172, Joburg Water JWAPP-40128554, Tshwane TSH-882910), load shedding schedules, water tanker deployment protocols, and municipal billing/debt relief rules.
 
@@ -176,7 +176,7 @@ Instructions:
       const latestUserMessage = messages[messages.length - 1];
       const historySummary = messages
         .slice(0, -1)
-        .map((m) => `${m.role === 'user' ? 'Resident' : 'CivicPulse AI'}: ${m.text}`)
+        .map((m) => `${m.role === 'user' ? 'Resident' : 'CivicRewards AI'}: ${m.text}`)
         .join('\n');
 
       const promptText = historySummary
@@ -299,7 +299,7 @@ Instructions:
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`CivicPulse AI server listening on http://0.0.0.0:${PORT}`);
+    console.log(`CivicRewards AI server listening on http://0.0.0.0:${PORT}`);
   });
 }
 

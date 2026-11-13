@@ -73,7 +73,7 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
           <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/12">
             <div>
               <div className="font-display text-base font-bold text-slate-900 dark:text-white">
-                CivicPulse Navigation
+                CivicRewards Navigation
               </div>
               <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
                 Swipe left / right between pages

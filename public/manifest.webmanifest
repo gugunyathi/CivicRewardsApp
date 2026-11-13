@@ -1,0 +1,64 @@
+{
+  "name": "CivicRewards South Africa",
+  "short_name": "CivicRewards",
+  "description": "Report municipal faults with AI forensic verification, live ward maps, councillor escalation, and CivicRewards.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B2545",
+  "theme_color": "#0B2545",
+  "lang": "en-ZA",
+  "dir": "ltr",
+  "categories": ["utilities", "government"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Report a fault",
+      "short_name": "Report",
+      "description": "Log a municipal fault with photo evidence",
+      "url": "/?action=report",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live fault map",
+      "short_name": "Map",
+      "description": "Open the live ward and fault map",
+      "url": "/?view=map",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "CivicRewards",
+      "short_name": "Rewards",
+      "description": "View credits and redeem vouchers",
+      "url": "/?view=rewards",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -21,7 +21,7 @@ export function buildReportShareText(report: CivicReport, ctx: ShareContext): st
       : `SLA: ${slaCountdownLabel(report)}`,
     `Households affected: +${report.clusteredHouseholds}`,
     `Map: ${osmDirectionsUrl(report.lat, report.lng)}`,
-    `Escalated via CivicPulse AI (${ctx.councillorName})`,
+    `Escalated via CivicRewards AI (${ctx.councillorName})`,
   ];
   return lines.join('\n');
 }

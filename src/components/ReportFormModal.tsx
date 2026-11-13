@@ -591,7 +591,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       title: title.trim() || `${currentCategory.shortTitle} fault at ${address}`,
       description:
         description.trim() ||
-        `Reported via CivicPulse AI mobile wizard for ${assignedDepot}.`,
+        `Reported via CivicRewards AI mobile wizard for ${assignedDepot}.`,
       address: address.trim() || `${activeWard.corridors[0] || 'Main Rd'}, ${activeWard.suburbs[0]}`,
       lat: pinLat,
       lng: pinLng,

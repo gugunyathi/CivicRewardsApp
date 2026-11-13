@@ -97,7 +97,7 @@ export function getRefGuidance(depot: string, entityHandle: string, slaHours: nu
     entityHandle,
     slaHours,
     steps: [
-      `Note your CivicPulse ticket ID from the summary screen.`,
+      `Note your CivicRewards ticket ID from the summary screen.`,
       `Log the same fault with ${depot} (portal, call centre, or ${entityHandle}) and quote your ticket ID.`,
       `Paste the official reference number they issue into the Ref # field — it replaces the provisional ref.`,
     ],

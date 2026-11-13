@@ -60,7 +60,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
     {
       id: 'welcome',
       role: 'assistant',
-      text: `Hello! I'm your CivicPulse AI Assistant for ${activeWard.municipalityName}, Ward ${activeWard.wardNumber} (${activeWard.suburbs.join(', ')}). Describe a fault, upload a photo, or ask about municipal bylaws, billing disputes, or depot escalation rules.`,
+      text: `Hello! I'm your CivicRewards AI Assistant for ${activeWard.municipalityName}, Ward ${activeWard.wardNumber} (${activeWard.suburbs.join(', ')}). Describe a fault, upload a photo, or ask about municipal bylaws, billing disputes, or depot escalation rules.`,
     },
   ]);
   const [input, setInput] = useState('');
@@ -201,7 +201,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
         summaryLabel: 'Logged via Conversational AI Triage',
         timestampLabel: 'Timestamp: Live Chat Session',
         gpsMatchLabel: `Ward ${activeWard.wardNumber} Bound Pin`,
-        deviceLabel: 'CivicPulse AI Chat',
+        deviceLabel: 'CivicRewards AI Chat',
         aiSyntheticScorePct: 0,
         notes: 'Parsed and validated by Gemini Civic Assistant.',
       },
@@ -226,7 +226,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
           <div>
             <h2 className="font-display text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-              <span>CivicPulse AI Assistant</span>
+              <span>CivicRewards AI Assistant</span>
             </h2>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               Ward {activeWard.wardNumber} · Bylaws, Depots & Conversational Reporting

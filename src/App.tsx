@@ -86,6 +86,19 @@ export default function App() {
       .then(({ profile }) => handleAuthSuccess(profile))
       .catch(() => {});
   }, []);
+  // PWA shortcut / share-target deep links: ?view=<tab>&action=report
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    const action = params.get('action');
+    const validViews = ['hub', 'feed', 'map', 'desk', 'social', 'directory', 'rewards', 'profile'];
+    if (view && validViews.includes(view)) setActiveView(view as AppView);
+    if (action === 'report') {
+      setReportCategory('water');
+      setReportModalOpen(true);
+    }
+    if (view || action) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   useEffect(() => {
     if (!toastMessage) return;

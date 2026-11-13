@@ -9,6 +9,7 @@ import {
   User,
 } from 'lucide-react';
 import type { AppView, UserProfile, WardRecord } from '../types/civic';
+import { InstallButton } from './InstallButton';
 
 interface TopBarProps {
   activeView: AppView;
@@ -68,7 +69,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             className="flex items-center gap-1.5 font-display text-base font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-sky-500 dark:text-sky-400" />
-            <span>CivicPulse</span>
+            <span>CivicRewards</span>
           </button>
 
           <button
@@ -107,6 +108,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Zone 3: Compact Utilities + Queue Counter */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <InstallButton />
           <button
             type="button"
             onClick={() => onSelectView('rewards')}

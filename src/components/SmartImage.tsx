@@ -18,7 +18,7 @@ import type { ServiceCategoryId } from '../types/civic';
 
 const CATEGORY_VISUALS: Record<
   ServiceCategoryId,
-  { icon: React.ComponentType<{ className?: string }>; bg: string; fg: string }
+  { icon: React.ComponentType<{ className?: string; color?: string }>; bg: string; fg: string }
 > = {
   water: { icon: Droplets, bg: '#0c4a6e', fg: '#7dd3fc' },
   electricity: { icon: Zap, bg: '#451a03', fg: '#fbbf24' },
@@ -37,7 +37,7 @@ interface SmartImageProps {
   alt: string;
   categoryId?: ServiceCategoryId;
   label?: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string; color?: string }>;
   className?: string;
   imgClassName?: string;
   eager?: boolean;
@@ -87,7 +87,7 @@ export const SmartImage: React.FC<SmartImageProps> = ({
         <span className="relative text-[11px] font-semibold text-white/90 leading-tight">
           {label ?? alt}
         </span>
-        <span className="relative font-mono text-[10px] text-white/50">CivicPulse capture</span>
+        <span className="relative font-mono text-[10px] text-white/50">CivicRewards capture</span>
       </div>
     );
   }

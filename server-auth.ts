@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Express, Request, Response } from 'express';
 
 // ---------------------------------------------------------------------------
-// CivicPulse session auth: Google ID-token login + WhatsApp OTP login.
+// CivicRewards session auth: Google ID-token login + WhatsApp OTP login.
 // Stateless HMAC-signed session cookie (30 days), httpOnly. No new deps.
 // Swap the in-memory OTP store for Redis/DB when scaling past one instance.
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ async function sendWhatsAppOtp(mobile: string, code: string): Promise<{ devCode?
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         to: mobile,
-        body: `Your CivicPulse verification code is ${code}. Valid for 10 minutes.`,
+        body: `Your CivicRewards verification code is ${code}. Valid for 10 minutes.`,
       }),
     });
     return {};
@@ -321,7 +321,7 @@ export function registerAuthRoutes(app: Express): void {
     const profile = issueSession(res, {
       id: `demo_${randomBytes(6).toString('hex')}`,
       name: (name ?? '').trim() || 'Demo Resident',
-      emailOrHandle: (email ?? '').trim() || 'demo@civicpulse.local',
+      emailOrHandle: (email ?? '').trim() || 'demo@civicrewards.local',
       mobileZa: normalizeSaMobile(mobile ?? '') ?? (mobile ?? '').trim(),
       channel: channel ?? 'email_za',
       demo: true,

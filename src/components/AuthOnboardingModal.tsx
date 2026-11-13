@@ -182,7 +182,7 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
       const { profile } = await authClient.demo(
         nameInput.trim() || 'Demo Resident',
         mobileInput.trim(),
-        emailInput.trim() || 'demo@civicpulse.local',
+        emailInput.trim() || 'demo@civicrewards.local',
         channel
       );
       onAuthSuccess(profile);
@@ -262,7 +262,7 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
               <h2 id="auth-modal-title" className="font-display text-base font-bold text-slate-900 dark:text-white truncate">
                 {step === 1 && 'Where is your municipal ward?'}
                 {step === 2 && 'Verify & sign in'}
-                {step === 3 && 'Your CivicPulse profile summary'}
+                {step === 3 && 'Your CivicRewards profile summary'}
               </h2>
             </div>
 

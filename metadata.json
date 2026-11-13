@@ -1,5 +1,5 @@
 {
-  "name": "CivicPulse AI",
+  "name": "CivicRewards AI",
   "description": "Next-generation South African Smart City & Active Citizenry Civic Reporting Platform with AI Media Forensics, Auto-Ward Profiling, Councillor Escalation, and CivicRewards.",
   "requestFramePermissions": ["geolocation", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
