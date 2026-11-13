@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { SEED_WARD_TOWN_BENCHMARKS } from '../data/civicSeedData';
+import { SmartImage } from './SmartImage';
 import type {
   CivicReport,
   MonthlyMunicipalBill,
@@ -387,6 +388,13 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   key={rep.id}
                   className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-4 flex flex-col justify-between gap-2.5"
                 >
+                  <SmartImage
+                    src={rep.photoUrl}
+                    alt={rep.title}
+                    categoryId={rep.categoryId}
+                    label={`${rep.departmentLabel} · ${rep.suburb}`}
+                    className="h-28 w-full"
+                  />
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[11px] font-mono">
                       <span className="text-sky-600 dark:text-sky-400 font-semibold">

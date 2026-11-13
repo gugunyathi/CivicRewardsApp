@@ -9,6 +9,20 @@ import type {
   TownWardBillBenchmark,
   WardRecord,
 } from '../types/civic';
+import imgAccounts from '../assets/images/cat_accounts_1794569476927.jpg';
+import imgAnticorruption from '../assets/images/cat_anticorruption_1794569475826.jpg';
+import imgElectricity from '../assets/images/cat_electricity_1794569473106.jpg';
+import imgNotices from '../assets/images/cat_notices_1794569479070.jpg';
+import imgParks from '../assets/images/cat_parks_1794569475928.jpg';
+import imgPipeBurst from '../assets/images/evidence_pipe_burst_1794565148729.jpg';
+import imgSinkhole from '../assets/images/evidence_synthetic_sinkhole_1794565149966.jpg';
+import imgRoads from '../assets/images/cat_roads_1794569473828.jpg';
+import imgSafety from '../assets/images/cat_safety_1794569475154.jpg';
+import imgStreetlights from '../assets/images/cat_streetlights_1794569474617.jpg';
+import imgSubstation from '../assets/images/evidence_substation_trip_1794565149490.jpg';
+import imgTrafficSignal from '../assets/images/evidence_traffic_signal_1794565149264.jpg';
+import imgWaste from '../assets/images/cat_waste_1794569476302.jpg';
+import imgWater from '../assets/images/cat_water_1794569471977.jpg';
 
 export const MUNICIPALITIES: Record<
   MunicipalityCode,
@@ -370,7 +384,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Burst mains, low pressure, sewer overflows',
     refHint: 'JWAPP-40128554',
     slaHours: 24,
-    imageUrl: '/src/assets/images/cat_water_1794569471977.jpg',
+    imageUrl: imgWater,
   },
   {
     id: 'electricity',
@@ -380,7 +394,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Tripped substations, outages & feeder faults',
     refHint: 'CPWEB5012172',
     slaHours: 24,
-    imageUrl: '/src/assets/images/cat_electricity_1794569473106.jpg',
+    imageUrl: imgElectricity,
   },
   {
     id: 'roads',
@@ -390,7 +404,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Potholes, sinkholes & blocked stormwater drains',
     refHint: 'JRA-2026-9182',
     slaHours: 72,
-    imageUrl: '/src/assets/images/cat_roads_1794569473828.jpg',
+    imageUrl: imgRoads,
   },
   {
     id: 'streetlights',
@@ -400,7 +414,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Out traffic intersections & dark streetlamps',
     refHint: 'TSH-882910',
     slaHours: 24,
-    imageUrl: '/src/assets/images/cat_streetlights_1794569474617.jpg',
+    imageUrl: imgStreetlights,
   },
   {
     id: 'waste',
@@ -410,7 +424,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Missed refuse rounds & illegal dumping sites',
     refHint: 'PKT-334912',
     slaHours: 48,
-    imageUrl: '/src/assets/images/cat_waste_1794569476302.jpg',
+    imageUrl: imgWaste,
   },
   {
     id: 'parks',
@@ -420,7 +434,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Fallen branches, overgrown verges & parks',
     refHint: 'JCP-194022',
     slaHours: 48,
-    imageUrl: '/src/assets/images/cat_parks_1794569475928.jpg',
+    imageUrl: imgParks,
   },
   {
     id: 'safety',
@@ -430,7 +444,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Traffic hazards, bylaw enforcement & cable theft',
     refHint: 'JMPD-77401',
     slaHours: 4,
-    imageUrl: '/src/assets/images/cat_safety_1794569475154.jpg',
+    imageUrl: imgSafety,
   },
   {
     id: 'accounts',
@@ -440,7 +454,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Smart meter readings, billing & indigent relief',
     refHint: 'ACC-900412881',
     slaHours: 72,
-    imageUrl: '/src/assets/images/cat_accounts_1794569476927.jpg',
+    imageUrl: imgAccounts,
     isInfoModule: true,
   },
   {
@@ -451,7 +465,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Zero-identity encrypted integrity reporting',
     refHint: 'GFIS-ANON',
     slaHours: 12,
-    imageUrl: '/src/assets/images/cat_anticorruption_1794569475826.jpg',
+    imageUrl: imgAnticorruption,
     isInfoModule: true,
   },
   {
@@ -462,7 +476,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Planned shutdowns, bylaws & IEC voter checks',
     refHint: 'NOTICE-2026',
     slaHours: 0,
-    imageUrl: '/src/assets/images/cat_notices_1794569479070.jpg',
+    imageUrl: imgNotices,
     isInfoModule: true,
   },
 ];
@@ -493,7 +507,7 @@ export const SEED_REPORTS: CivicReport[] = [
     slaElapsedHours: 2,
     assignedDepot: 'Joburg Water Randburg Depot',
     reporterName: 'Thabo M.',
-    photoUrl: '/src/assets/images/evidence_pipe_burst_1794565148729.jpg',
+    photoUrl: imgPipeBurst,
     forensics: {
       status: 'VERIFIED',
       summaryLabel: 'Verified Live Capture (GPS + Timestamp Match)',
@@ -537,7 +551,7 @@ export const SEED_REPORTS: CivicReport[] = [
     slaElapsedHours: 26,
     assignedDepot: 'City Power Randburg Depot',
     reporterName: 'Annelize V.',
-    photoUrl: '/src/assets/images/evidence_substation_trip_1794565149490.jpg',
+    photoUrl: imgSubstation,
     forensics: {
       status: 'VERIFIED',
       summaryLabel: 'Verified Live Capture (GPS + Timestamp Match)',
@@ -579,7 +593,7 @@ export const SEED_REPORTS: CivicReport[] = [
     slaElapsedHours: 1,
     assignedDepot: 'CoCT Roads Woodstock Depot',
     reporterName: 'Unverified Guest',
-    photoUrl: '/src/assets/images/evidence_synthetic_sinkhole_1794565149966.jpg',
+    photoUrl: imgSinkhole,
     forensics: {
       status: 'FLAGGED_SYNTHETIC',
       summaryLabel: 'Flagged Synthetic / AI-Generated (Blocked)',
@@ -621,7 +635,7 @@ export const SEED_REPORTS: CivicReport[] = [
     slaElapsedHours: 1,
     assignedDepot: 'Tshwane Roads East Depot',
     reporterName: 'Lindiwe K.',
-    photoUrl: '/src/assets/images/evidence_traffic_signal_1794565149264.jpg',
+    photoUrl: imgTrafficSignal,
     forensics: {
       status: 'WARNING_STRIPPED_METADATA',
       summaryLabel: 'Metadata Stripped (WhatsApp Forward)',
@@ -663,7 +677,7 @@ export const SEED_REPORTS: CivicReport[] = [
     slaElapsedHours: 38,
     assignedDepot: 'JRA Region A Depot',
     reporterName: 'Gugu Ndlovu',
-    photoUrl: '/src/assets/images/cat_roads_1794569473828.jpg',
+    photoUrl: imgRoads,
     forensics: {
       status: 'VERIFIED',
       summaryLabel: 'Verified Live Capture + Resident Fix Confirmed',
@@ -705,7 +719,7 @@ export const SEED_REPORTS: CivicReport[] = [
     slaElapsedHours: 19,
     assignedDepot: 'City Power Bryanston Depot',
     reporterName: 'Gugu Ndlovu',
-    photoUrl: '/src/assets/images/cat_streetlights_1794569474617.jpg',
+    photoUrl: imgStreetlights,
     forensics: {
       status: 'VERIFIED',
       summaryLabel: 'Verified Live Capture + Closed Within SLA',

@@ -29,6 +29,8 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import samplePipeBurst from '../assets/images/evidence_pipe_burst_1794565148729.jpg';
+import sampleSinkhole from '../assets/images/evidence_synthetic_sinkhole_1794565149966.jpg';
 import { SERVICE_CATEGORIES } from '../data/civicSeedData';
 import type {
   CivicReport,
@@ -39,6 +41,7 @@ import type {
   WardRecord,
 } from '../types/civic';
 import { getDepotForCategory, haversineDistanceMeters } from '../utils/wardResolver';
+import { BASEMAP_ORDER, BASEMAPS, type BasemapId } from '../utils/mapTiles';
 import { InteractiveMap } from './InteractiveMap';
 
 interface ReportFormModalProps {
@@ -57,7 +60,7 @@ const SAMPLE_TEST_MEDIA = [
   {
     id: 'sample-real-water',
     label: 'Real Photo: Pipe Burst',
-    url: '/src/assets/images/evidence_pipe_burst_1794565148729.jpg',
+    url: samplePipeBurst,
     simulatedExif: {
       timestampIso: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
       ageMinutes: 18,
@@ -70,7 +73,7 @@ const SAMPLE_TEST_MEDIA = [
   {
     id: 'sample-synthetic',
     label: 'Test Synthetic AI Image',
-    url: '/src/assets/images/evidence_synthetic_sinkhole_1794565149966.jpg',
+    url: sampleSinkhole,
     simulatedExif: {
       timestampIso: null,
       ageMinutes: null,
@@ -300,6 +303,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   const [severity, setSeverity] = useState<SeverityLevel>(emergencyMode ? 'CRITICAL' : 'MODERATE');
   const [isEmergency, setIsEmergency] = useState(emergencyMode);
   const [isLocatingGps, setIsLocatingGps] = useState(false);
+  const [pickerBasemap, setPickerBasemap] = useState<BasemapId | undefined>(undefined);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [exifData, setExifData] = useState<ExifMetadataPayload | null>(null);
@@ -1061,6 +1065,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   centerLng={pinLng}
                   zoom={14}
                   darkMode={darkMode}
+                  basemap={pickerBasemap}
                   mode="picker"
                   className="w-full h-full"
                   pickedLat={pinLat}
@@ -1076,6 +1081,23 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   <LocateFixed className="w-3.5 h-3.5 text-sky-400" />
                   <span>{isLocatingGps ? 'Locating...' : 'My GPS'}</span>
                 </button>
+                <div className="absolute top-2 left-2 z-[400] flex items-center gap-0.5 p-0.5 bg-slate-900/90 border border-white/25">
+                  {BASEMAP_ORDER.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setPickerBasemap(id)}
+                      title={BASEMAPS[id].label}
+                      className={`px-1.5 py-1 text-[10px] font-mono font-semibold cursor-pointer ${
+                        (pickerBasemap ?? (darkMode ? "dark" : "streets")) === id
+                          ? "bg-white text-slate-900"
+                          : "text-white/80"
+                      }`}
+                    >
+                      {BASEMAPS[id].shortLabel}
+                    </button>
+                  ))}
+                </div>
                 <div className="absolute bottom-2 left-2 z-[400] px-2 py-1 bg-black/75 text-white font-mono text-[10px]">
                   {pinLat.toFixed(4)}, {pinLng.toFixed(4)} · Tap map to move pin
                 </div>

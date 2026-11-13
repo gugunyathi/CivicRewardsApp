@@ -18,11 +18,16 @@ import type {
   UserProfile,
   WardRecord,
 } from '../types/civic';
+import { MiniMapPreview } from './MiniMapPreview';
+import { AvatarPlaceholder, RewardCategoryIcon } from './SmartImage';
 
 interface DirectoryViewProps {
   activeWard: WardRecord;
   onBindWard: (wardId: string) => void;
 }
+
+const isDarkTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
 export const DirectoryView: React.FC<DirectoryViewProps> = ({ activeWard, onBindWard }) => {
   const [metroFilter, setMetroFilter] = useState<'ALL' | MunicipalityCode>('ALL');
@@ -131,84 +136,99 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({ activeWard, onBind
           return (
             <article
               key={ward.id}
-              className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-4 space-y-3"
+              className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 overflow-hidden"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-medium text-sky-600 dark:text-sky-400 truncate">
-                    {ward.municipalityName} ({MUNICIPALITIES[ward.municipalityCode].totalWards} wards)
-                  </div>
-                  <h2 className="font-display text-base font-bold text-slate-900 dark:text-white truncate">
-                    Ward {ward.wardNumber} · {ward.suburbs.join(', ')}
-                  </h2>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="font-display text-lg font-bold text-slate-900 dark:text-white tabular-nums">
-                    {ward.councillor.resolutionScore}%
-                  </div>
-                  <div className="text-[10px] text-slate-500">SLA Score</div>
-                </div>
-              </div>
+              {/* Free ward location map preview */}
+              <MiniMapPreview
+                lat={ward.lat}
+                lng={ward.lng}
+                zoom={12}
+                darkMode={isDarkTheme()}
+                label={`Ward ${ward.wardNumber} · ${ward.suburbs[0]}`}
+                className="h-24 w-full"
+              />
 
-              <div className="h-1 bg-slate-100 dark:bg-white/10 overflow-hidden">
-                <div
-                  className="h-full bg-sky-500"
-                  style={{ width: `${ward.councillor.resolutionScore}%` }}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="space-y-0.5 min-w-0">
-                  <div className="font-semibold text-slate-900 dark:text-white truncate">
-                    {ward.councillor.name} ({ward.councillor.party})
+              <div className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-medium text-sky-600 dark:text-sky-400 truncate">
+                      {ward.municipalityName} ({MUNICIPALITIES[ward.municipalityCode].totalWards} wards)
+                    </div>
+                    <h2 className="font-display text-base font-bold text-slate-900 dark:text-white truncate">
+                      Ward {ward.wardNumber} · {ward.suburbs.join(', ')}
+                    </h2>
                   </div>
-                  <div className="text-slate-500 dark:text-slate-400 flex items-center gap-1 text-[11px]">
-                    <Mail className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{ward.councillor.email}</span>
-                  </div>
-                  <div className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 text-[11px]">
-                    <Phone className="w-3 h-3 shrink-0" />
-                    <span>{ward.councillor.whatsappEscalation}</span>
+                  <div className="text-right shrink-0">
+                    <div className="font-display text-lg font-bold text-slate-900 dark:text-white tabular-nums">
+                      {ward.councillor.resolutionScore}%
+                    </div>
+                    <div className="text-[10px] text-slate-500">SLA Score</div>
                   </div>
                 </div>
 
-                <div className="space-y-0.5 text-[11px] text-slate-600 dark:text-slate-300">
-                  <div className="flex items-center justify-between">
-                    <span>Active Tickets</span>
-                    <strong className="font-mono tabular-nums">{ward.councillor.activeTickets}</strong>
+                <div className="h-1 bg-slate-100 dark:bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full bg-sky-500"
+                    style={{ width: `${ward.councillor.resolutionScore}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <AvatarPlaceholder name={ward.councillor.name} className="w-9 h-9 text-[11px]" />
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="font-semibold text-slate-900 dark:text-white truncate">
+                        {ward.councillor.name} ({ward.councillor.party})
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400 flex items-center gap-1 text-[11px]">
+                        <Mail className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{ward.councillor.email}</span>
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 text-[11px]">
+                        <Phone className="w-3 h-3 shrink-0" />
+                        <span>{ward.councillor.whatsappEscalation}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span>Resolved / Mo</span>
-                    <strong className="font-mono tabular-nums">{ward.councillor.monthlyResolutions}</strong>
+
+                  <div className="space-y-0.5 text-[11px] text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center justify-between">
+                      <span>Active Tickets</span>
+                      <strong className="font-mono tabular-nums">{ward.councillor.activeTickets}</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Resolved / Mo</span>
+                      <strong className="font-mono tabular-nums">{ward.councillor.monthlyResolutions}</strong>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-2.5 bg-slate-50 dark:bg-white/[0.03] text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
-                <div className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                  <Building2 className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">
-                    {ward.depots.water} · {ward.depots.electricity}
+                <div className="p-2.5 bg-slate-50 dark:bg-white/[0.03] text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">
+                      {ward.depots.water} · {ward.depots.electricity}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {ward.lat.toFixed(3)}, {ward.lng.toFixed(3)}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => onBindWard(ward.id)}
+                    className={`min-h-[36px] px-3 text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
+                      isHome
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40'
+                        : 'bg-slate-900 dark:bg-white text-white dark:text-slate-950'
+                    }`}
+                  >
+                    {isHome ? <CheckCircle2 className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
+                    <span>{isHome ? 'Active Ward' : 'Set Active'}</span>
+                  </button>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-0.5">
-                <span className="text-[11px] font-mono text-slate-400">
-                  {ward.lat.toFixed(3)}, {ward.lng.toFixed(3)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onBindWard(ward.id)}
-                  className={`min-h-[36px] px-3 text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
-                    isHome
-                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40'
-                      : 'bg-slate-900 dark:bg-white text-white dark:text-slate-950'
-                  }`}
-                >
-                  {isHome ? <CheckCircle2 className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
-                  <span>{isHome ? 'Active Ward' : 'Set Active'}</span>
-                </button>
               </div>
             </article>
           );
@@ -342,13 +362,21 @@ export const RewardsView: React.FC<RewardsViewProps> = ({
                   key={offer.id}
                   className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-3.5 flex flex-col justify-between gap-3"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="font-semibold text-sky-600 dark:text-sky-400">{offer.partner}</span>
-                      <span>{offer.category}</span>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <AvatarPlaceholder name={offer.partner} className="w-8 h-8 text-[10px]" />
+                        <span className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 truncate">
+                          {offer.partner}
+                        </span>
+                      </div>
+                      <span className="shrink-0 w-7 h-7 flex items-center justify-center border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 text-amber-600 dark:text-amber-400">
+                        <RewardCategoryIcon category={offer.category} />
+                      </span>
                     </div>
                     <div className="text-sm font-bold text-slate-900 dark:text-white">{offer.title}</div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{offer.description}</p>
+                    <div className="font-mono text-[10px] text-slate-400">{offer.category}</div>
                   </div>
 
                   <button

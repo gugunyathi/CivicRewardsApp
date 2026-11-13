@@ -11,6 +11,8 @@ import {
   Users,
 } from 'lucide-react';
 import type { CivicReport, WardRecord } from '../types/civic';
+import { MiniMapPreview } from './MiniMapPreview';
+import { SmartImage } from './SmartImage';
 
 interface WardFeedViewProps {
   reports: CivicReport[];
@@ -20,6 +22,9 @@ interface WardFeedViewProps {
   onOpenReportModal: () => void;
   onOpenOnMap: () => void;
 }
+
+const isDarkTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
 export const WardFeedView: React.FC<WardFeedViewProps> = ({
   reports,
@@ -165,23 +170,22 @@ export const WardFeedView: React.FC<WardFeedViewProps> = ({
                 key={report.id}
                 className="border border-slate-200 dark:border-white/15 bg-white dark:bg-[#0A0E17] overflow-hidden flex flex-col"
               >
-                {report.photoUrl && (
-                  <div className="relative h-44 sm:h-48 bg-slate-900 overflow-hidden">
-                    <img
-                      src={report.photoUrl}
-                      alt={report.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
-                    <div className="absolute bottom-2.5 left-3.5 right-3.5 flex items-end justify-between gap-2 text-white">
-                      <span className="font-mono text-[11px]">
-                        {report.id} · {report.municipalRef || 'NO REF'}
-                      </span>
-                      <span className="text-xs font-semibold">{report.status}</span>
-                    </div>
+                <div className="relative h-44 sm:h-48 bg-slate-900 overflow-hidden">
+                  <SmartImage
+                    src={report.photoUrl}
+                    alt={report.title}
+                    categoryId={report.categoryId}
+                    label={`${report.departmentLabel} · ${report.suburb}`}
+                    className="w-full h-full"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent pointer-events-none" />
+                  <div className="absolute bottom-2.5 left-3.5 right-3.5 flex items-end justify-between gap-2 text-white">
+                    <span className="font-mono text-[11px]">
+                      {report.id} · {report.municipalRef || 'NO REF'}
+                    </span>
+                    <span className="text-xs font-semibold">{report.status}</span>
                   </div>
-                )}
+                </div>
 
                 <div className="p-4 flex-1 flex flex-col justify-between gap-3">
                   <div className="space-y-1.5">
@@ -216,6 +220,33 @@ export const WardFeedView: React.FC<WardFeedViewProps> = ({
 
                     <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400 truncate">
                       {report.forensics.timestampLabel} · {report.forensics.gpsMatchLabel}
+                    </div>
+
+                    {/* Free mini map pinpointing the fault location */}
+                    <div className="flex gap-2.5 items-stretch pt-1">
+                      <MiniMapPreview
+                        lat={report.lat}
+                        lng={report.lng}
+                        zoom={14}
+                        darkMode={isDarkTheme()}
+                        label={`${report.lat.toFixed(3)}, ${report.lng.toFixed(3)}`}
+                        pinColor={isBlocked ? '#dc2626' : isVerified ? '#059669' : '#0284c7'}
+                        className="w-32 h-20 shrink-0 border border-slate-200 dark:border-white/15"
+                        onExpand={onOpenOnMap}
+                      />
+                      <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 text-[11px] text-slate-600 dark:text-slate-300">
+                        <span className="flex items-start gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-sky-500 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">{report.address}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={onOpenOnMap}
+                          className="self-start font-mono text-[11px] text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                        >
+                          Open on live map →
+                        </button>
+                      </div>
                     </div>
                   </div>
 

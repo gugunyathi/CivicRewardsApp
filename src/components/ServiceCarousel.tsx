@@ -16,6 +16,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { ServiceCategory, ServiceCategoryId, WardRecord } from '../types/civic';
+import { SmartImage } from './SmartImage';
 
 const SERVICE_INDICATOR_META: Record<
   ServiceCategoryId,
@@ -52,6 +53,7 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const activeCategory = categories[activeIndex] ?? categories[0];
+  const ActiveIcon = SERVICE_INDICATOR_META[activeCategory.id].icon;
 
   useEffect(() => {
     const el = itemRefs.current[activeIndex];
@@ -127,6 +129,8 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
             {categories.map((cat, idx) => {
               const isActive = idx === activeIndex;
               const numLabel = String(idx + 1).padStart(2, '0');
+              const meta = SERVICE_INDICATOR_META[cat.id];
+              const ThumbIcon = meta.icon;
 
               return (
                 <button
@@ -150,17 +154,20 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
                       : 'w-[19vw] sm:w-[84px] lg:w-[106px] hover:sm:w-[126px] h-[270px] sm:h-[360px] lg:h-[400px] border border-slate-200 dark:border-white/15 opacity-80 hover:opacity-100'
                   }`}
                 >
-                  <img
+                  <SmartImage
                     src={cat.imageUrl}
                     alt={cat.title}
-                    referrerPolicy="no-referrer"
-                    className={`w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    categoryId={cat.id}
+                    label={cat.shortTitle}
+                    eager={isActive}
+                    className="w-full h-full"
+                    imgClassName={`w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                       isActive ? 'scale-100' : 'scale-105 group-hover:scale-100'
                     }`}
                   />
 
                   <div
-                    className={`absolute inset-0 transition-opacity duration-300 ${
+                    className={`absolute inset-0 transition-opacity duration-300 pointer-events-none ${
                       isActive
                         ? 'bg-gradient-to-t from-black/55 via-transparent to-black/10'
                         : 'bg-gradient-to-t from-black/80 via-black/25 to-black/15'
@@ -173,11 +180,24 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
                       <span className="absolute top-0 right-0 w-2 h-2 border-l border-b border-sky-400 bg-white dark:bg-[#060911]" />
                       <span className="absolute bottom-0 left-0 w-2 h-2 border-r border-t border-sky-400 bg-white dark:bg-[#060911]" />
                       <span className="absolute bottom-0 right-0 w-2 h-2 border-l border-t border-sky-400 bg-white dark:bg-[#060911]" />
+                      {/* Service icon chip + number badge */}
+                      <span className="absolute top-2.5 left-3 flex items-center gap-1.5">
+                        <span className="w-8 h-8 bg-black/60 border border-white/25 backdrop-blur-sm flex items-center justify-center">
+                          <ThumbIcon className={`w-4 h-4 ${meta.colorClass}`} />
+                        </span>
+                        <span className="font-mono text-[11px] text-white/90 bg-black/60 border border-white/25 px-1.5 py-1">
+                          {numLabel}
+                        </span>
+                      </span>
+                      <span className="absolute top-2.5 right-3 font-mono text-[10px] text-white bg-black/60 border border-white/25 px-1.5 py-1">
+                        {cat.slaHours > 0 ? `${cat.slaHours}H SLA` : 'PORTAL'}
+                      </span>
                     </>
                   )}
 
                   {!isActive ? (
-                    <div className="absolute inset-x-0 bottom-2 px-1.5 flex flex-col items-start gap-0.5 text-white">
+                    <div className="absolute inset-x-0 bottom-2 px-1.5 flex flex-col items-start gap-1 text-white">
+                      <ThumbIcon className={`w-4 h-4 ${meta.colorClass}`} />
                       <span className="text-[10px] font-semibold leading-tight truncate w-full">
                         {cat.shortTitle}
                       </span>
@@ -230,9 +250,12 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
 
         {/* Compact Editorial Footer Bar */}
         <div className="pt-2.5 border-t border-slate-200 dark:border-white/15 flex items-center justify-between gap-2.5">
-          <div className="space-y-0.5 min-w-0">
-            <h2 className="font-display text-sm sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
-              {activeCategory.title}
+          <div className="space-y-0.5 min-w-0 flex-1">
+            <h2 className="font-display text-sm sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate flex items-center gap-2">
+              <span className="w-7 h-7 shrink-0 hidden sm:flex items-center justify-center border border-sky-500/40 bg-sky-500/10">
+                <ActiveIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+              </span>
+              <span className="truncate">{activeCategory.title}</span>
             </h2>
             <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 truncate">
               Ward {activeWard.wardNumber} ({activeWard.suburbs[0]}) · {activeCategory.description}

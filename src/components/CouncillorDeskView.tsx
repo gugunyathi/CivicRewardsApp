@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { SEED_WARDS } from '../data/civicSeedData';
 import type { CivicReport, ReportStatus, WardRecord } from '../types/civic';
+import { MiniMapPreview } from './MiniMapPreview';
+import { SmartImage } from './SmartImage';
 
 interface CouncillorDeskViewProps {
   reports: CivicReport[];
@@ -29,6 +31,9 @@ const WORKFLOW_STEPS: ReportStatus[] = [
   'Technician Dispatched',
   'Resolved',
 ];
+
+const isDarkTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
 export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
   reports,
@@ -216,6 +221,35 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                       {slaBreached ? ' BREACHED' : ''}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Evidence photo + fault location map */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <div className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">
+                    Evidence capture
+                  </div>
+                  <SmartImage
+                    src={report.photoUrl}
+                    alt={report.title}
+                    categoryId={report.categoryId}
+                    label={`${report.departmentLabel} · ${report.suburb}`}
+                    className="h-32 w-full border border-slate-200 dark:border-white/15"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">
+                    Fault location
+                  </div>
+                  <MiniMapPreview
+                    lat={report.lat}
+                    lng={report.lng}
+                    zoom={14}
+                    darkMode={isDarkTheme()}
+                    label={`${report.address} · ${report.lat.toFixed(3)}, ${report.lng.toFixed(3)}`}
+                    className="h-32 w-full border border-slate-200 dark:border-white/15"
+                  />
                 </div>
               </div>
 
