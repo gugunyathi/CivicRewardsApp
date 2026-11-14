@@ -42,7 +42,7 @@ interface ServiceCarouselProps {
   activeWard: WardRecord;
 }
 
-export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
+export const ServiceCarousel: React.FC<ServiceCarouselProps> = React.memo(({
   categories,
   activeIndex,
   onSelectIndex,
@@ -94,21 +94,21 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
           else handlePrev();
         }
       }}
-      className="relative flex-1 flex flex-col justify-between border border-slate-200 dark:border-white/12 bg-white dark:bg-[#060911] overflow-hidden"
+      className="relative flex-1 flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_50%_0%,rgba(56,189,248,0.12),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,rgba(56,189,248,0.16),transparent_70%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(ellipse_at_50%_0%,rgba(5,150,105,0.08),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,rgba(16,185,129,0.10),transparent_70%)]"
       />
 
-      <div className="relative flex-1 flex flex-col justify-between p-2.5 sm:p-4 gap-3">
+      <div className="relative flex-1 flex flex-col justify-between p-3 sm:p-4 gap-3">
         {/* Carousel Track + Floating Edge Arrow Indicators */}
         <div className="relative">
           <button
             type="button"
             onClick={handlePrev}
             aria-label="Scroll categories left"
-            className="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 bg-black/55 hover:bg-black/80 text-white border border-white/25 backdrop-blur-sm flex items-center justify-center cursor-pointer"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-xl bg-slate-900/65 hover:bg-slate-900/85 text-white border border-white/20 backdrop-blur-sm flex items-center justify-center cursor-pointer active:scale-95 transition-[background-color,transform] duration-150"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -117,7 +117,7 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
             type="button"
             onClick={handleNext}
             aria-label="Scroll categories right"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 bg-black/55 hover:bg-black/80 text-white border border-white/25 backdrop-blur-sm flex items-center justify-center cursor-pointer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-xl bg-slate-900/65 hover:bg-slate-900/85 text-white border border-white/20 backdrop-blur-sm flex items-center justify-center cursor-pointer active:scale-95 transition-[background-color,transform] duration-150"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -148,10 +148,10 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
                   }}
                   aria-label={`${cat.title} (${numLabel})`}
                   aria-current={isActive ? 'true' : undefined}
-                  className={`group relative shrink-0 snap-center text-left overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-400 ${
+                  className={`group relative shrink-0 snap-center text-left rounded-2xl overflow-hidden transition-[width,opacity,border-color] duration-200 ease-out cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-500 ${
                     isActive
-                      ? 'w-[76vw] sm:w-[480px] lg:w-[580px] h-[clamp(350px,54dvh,520px)] sm:h-[clamp(440px,60dvh,600px)] lg:h-[clamp(480px,62dvh,640px)] border border-sky-500/85 dark:border-sky-400/85'
-                      : 'w-[18vw] sm:w-[88px] lg:w-[112px] hover:sm:w-[132px] h-[clamp(350px,54dvh,520px)] sm:h-[clamp(440px,60dvh,600px)] lg:h-[clamp(480px,62dvh,640px)] border border-slate-200 dark:border-white/15 opacity-80 hover:opacity-100'
+                      ? 'w-[76vw] sm:w-[480px] lg:w-[580px] h-[clamp(350px,54dvh,520px)] sm:h-[clamp(440px,60dvh,600px)] lg:h-[clamp(480px,62dvh,640px)] border-2 border-emerald-600 dark:border-emerald-400'
+                      : 'w-[18vw] sm:w-[88px] lg:w-[112px] hover:sm:w-[132px] h-[clamp(350px,54dvh,520px)] sm:h-[clamp(440px,60dvh,600px)] lg:h-[clamp(480px,62dvh,640px)] border border-slate-200/80 dark:border-white/[0.08] opacity-75 hover:opacity-100'
                   }`}
                 >
                   <SmartImage
@@ -161,54 +161,49 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
                     label={cat.shortTitle}
                     eager={isActive}
                     className="w-full h-full"
-                    imgClassName={`w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    imgClassName={`w-full h-full object-cover transition-transform duration-300 ease-out ${
                       isActive ? 'scale-100' : 'scale-105 group-hover:scale-100'
                     }`}
                   />
 
                   <div
-                    className={`absolute inset-0 transition-opacity duration-300 pointer-events-none ${
+                    className={`absolute inset-0 transition-opacity duration-200 pointer-events-none ${
                       isActive
-                        ? 'bg-gradient-to-t from-black/55 via-transparent to-black/10'
-                        : 'bg-gradient-to-t from-black/80 via-black/25 to-black/15'
+                        ? 'bg-gradient-to-t from-slate-950/65 via-transparent to-slate-950/15'
+                        : 'bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-slate-950/15'
                     }`}
                   />
 
                   {isActive && (
                     <>
-                      <span className="absolute top-0 left-0 w-2 h-2 border-r border-b border-sky-400 bg-white dark:bg-[#060911]" />
-                      <span className="absolute top-0 right-0 w-2 h-2 border-l border-b border-sky-400 bg-white dark:bg-[#060911]" />
-                      <span className="absolute bottom-0 left-0 w-2 h-2 border-r border-t border-sky-400 bg-white dark:bg-[#060911]" />
-                      <span className="absolute bottom-0 right-0 w-2 h-2 border-l border-t border-sky-400 bg-white dark:bg-[#060911]" />
-                      {/* Service icon chip + number badge */}
-                      <span className="absolute top-2.5 left-3 flex items-center gap-1.5">
-                        <span className="w-8 h-8 bg-black/60 border border-white/25 backdrop-blur-sm flex items-center justify-center">
+                      <span className="absolute top-3 left-3 flex items-center gap-1.5">
+                        <span className="w-8 h-8 rounded-lg bg-slate-950/65 border border-white/20 backdrop-blur-sm flex items-center justify-center">
                           <ThumbIcon className={`w-4 h-4 ${meta.colorClass}`} />
                         </span>
-                        <span className="font-mono text-[11px] text-white/90 bg-black/60 border border-white/25 px-1.5 py-1">
+                        <span className="font-mono text-[11px] font-medium tabular-nums text-white/95 bg-slate-950/65 border border-white/20 rounded-lg px-2 py-1 backdrop-blur-sm">
                           {numLabel}
                         </span>
                       </span>
-                      <span className="absolute top-2.5 right-3 font-mono text-[10px] text-white bg-black/60 border border-white/25 px-1.5 py-1">
-                        {cat.slaHours > 0 ? `${cat.slaHours}H SLA` : 'PORTAL'}
+                      <span className="absolute top-3 right-3 font-mono text-[10px] font-semibold tabular-nums text-white bg-slate-950/65 border border-white/20 rounded-lg px-2 py-1 backdrop-blur-sm">
+                        {cat.slaHours > 0 ? `${cat.slaHours}h SLA` : 'Portal'}
                       </span>
                     </>
                   )}
 
                   {!isActive ? (
-                    <div className="absolute inset-x-0 bottom-2 px-1.5 flex flex-col items-start gap-1 text-white">
+                    <div className="absolute inset-x-0 bottom-2.5 px-2 flex flex-col items-start gap-1 text-white">
                       <ThumbIcon className={`w-4 h-4 ${meta.colorClass}`} />
                       <span className="text-[10px] font-semibold leading-tight truncate w-full">
                         {cat.shortTitle}
                       </span>
                     </div>
                   ) : (
-                    <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white">
-                      <span className="font-mono text-[11px] text-white/90 truncate">
+                    <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between text-white">
+                      <span className="text-xs font-medium text-white/95 truncate">
                         {cat.entity}
                       </span>
                       <span className="text-[11px] font-medium text-white/80 hidden sm:inline shrink-0">
-                        Tap photo to open
+                        Tap card to open
                       </span>
                     </div>
                   )}
@@ -218,7 +213,7 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
           </div>
         </div>
 
-        {/* Single-Row 10 Service-Icon Indicator Boxes (Fits cleanly within mobile screen width) */}
+        {/* Single-Row 10 Service-Icon Indicator Boxes */}
         <div
           className="grid grid-cols-10 gap-1 sm:gap-1.5 w-full"
           role="tablist"
@@ -236,10 +231,10 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
                 title={cat.title}
                 aria-label={`Select ${cat.title}`}
                 aria-selected={active}
-                className={`h-9 sm:h-10 w-full flex items-center justify-center border transition-all cursor-pointer ${
+                className={`h-9 sm:h-10 w-full rounded-xl flex items-center justify-center border transition-[border-color,background-color,opacity,transform] duration-150 cursor-pointer active:scale-95 ${
                   active
-                    ? 'border-sky-500 bg-sky-500/15 dark:border-sky-400 dark:bg-sky-400/20'
-                    : 'border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 hover:border-slate-400 dark:hover:border-white/40 opacity-80 hover:opacity-100'
+                    ? 'border-emerald-600 bg-emerald-600/10 dark:border-emerald-400 dark:bg-emerald-400/15'
+                    : 'border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] hover:border-slate-300 dark:hover:border-white/20 opacity-80 hover:opacity-100'
                 }`}
               >
                 <Icon className={`w-4 h-4 sm:w-[18px] sm:h-[18px] ${meta.colorClass}`} />
@@ -249,29 +244,31 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
         </div>
 
         {/* Expanded Card Name & Service Details Footer */}
-        <div className="pt-3 pb-1 border-t border-slate-200 dark:border-white/15 flex items-center justify-between gap-3">
+        <div className="pt-3 pb-0.5 border-t border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-3">
           <div className="space-y-1 min-w-0 flex-1">
             <h2 className="font-display text-base sm:text-xl lg:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-              <span className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center border border-sky-500/40 bg-sky-500/10">
-                <ActiveIcon className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600 dark:text-sky-400" />
+              <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl shrink-0 flex items-center justify-center border border-emerald-600/25 bg-emerald-600/10 dark:border-emerald-400/25 dark:bg-emerald-400/10">
+                <ActiveIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-400" />
               </span>
               <span className="truncate">{activeCategory.title}</span>
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
               {activeCategory.description}
             </p>
-            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-              <span>Ward {activeWard.wardNumber} ({activeWard.suburbs[0]})</span>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+              <span>Ward {activeWard.wardNumber} · {activeWard.suburbs[0]}</span>
               <span aria-hidden="true">·</span>
               <span>{activeCategory.entity}</span>
               <span aria-hidden="true">·</span>
-              <span className="text-sky-700 dark:text-sky-400 font-semibold">
+              <span className="text-slate-700 dark:text-slate-200 font-medium">
                 {activeCategory.slaHours > 0 ? `${activeCategory.slaHours}h SLA` : 'Direct Portal'}
               </span>
               {!activeCategory.isInfoModule && (
                 <>
                   <span aria-hidden="true">·</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+50 CR</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
+                    +50 CR
+                  </span>
                 </>
               )}
             </div>
@@ -281,10 +278,10 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
             <button
               type="button"
               onClick={() => onTriggerCategory(activeCategory.id)}
-              className={`min-h-[48px] px-5 sm:px-7 py-2.5 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
+              className={`min-h-[48px] px-5 sm:px-7 py-2.5 rounded-xl flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150 ${
                 activeCategory.isInfoModule
                   ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 text-xs sm:text-sm font-semibold'
-                  : 'bg-red-600 hover:bg-red-700 text-white border border-red-500 text-sm sm:text-base font-extrabold uppercase tracking-wider shadow-lg shadow-red-600/25'
+                  : 'bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base font-extrabold uppercase tracking-wider shadow-sm'
               }`}
             >
               {activeCategory.isInfoModule ? (
@@ -304,4 +301,6 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
       </div>
     </section>
   );
-};
+});
+
+ServiceCarousel.displayName = 'ServiceCarousel';

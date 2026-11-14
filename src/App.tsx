@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthOnboardingModal } from './components/AuthOnboardingModal';
 import { BurgerMenuDrawer } from './components/BurgerMenuDrawer';
 import { CivicAssistantDrawer } from './components/CivicAssistantDrawer';
@@ -56,14 +56,14 @@ export default function App() {
     }
   });
 
-  const handleChangeServicesLayout = (next: 'carousel' | 'tiles') => {
+  const handleChangeServicesLayout = useCallback((next: 'carousel' | 'tiles') => {
     setServicesLayout(next);
     try {
       localStorage.setItem('civicpulse_services_layout', next);
     } catch {
       // ignore storage restrictions
     }
-  };
+  }, []);
 
   const [user, setUser] = useState<UserProfile>({
     name: 'Guest Resident',
@@ -96,13 +96,30 @@ export default function App() {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
+  const handleAuthSuccess = useCallback((profile: SessionProfile) => {
+    if (!profile || !profile.name) return;
+    try {
+      localStorage.setItem('civic_profile', JSON.stringify(profile));
+    } catch {
+      // private mode
+    }
+    setUser((prev) => ({
+      ...prev,
+      name: profile.name || prev.name,
+      emailOrHandle: profile.emailOrHandle || prev.emailOrHandle,
+      mobileZa: profile.mobileZa || prev.mobileZa,
+      authChannel: profile.channel || prev.authChannel,
+      signedIn: true,
+    }));
+  }, []);
+
   useEffect(() => {
     authClient
       .me()
       .then(({ profile }) => handleAuthSuccess(profile))
       .catch(() => {});
-  }, []);
-  // PWA shortcut / share-target deep links: ?view=<tab>&action=report
+  }, [handleAuthSuccess]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
@@ -113,7 +130,7 @@ export default function App() {
       setReportCategory('water');
       setReportModalOpen(true);
     }
-    if (view || action) window.history.replaceState({}, "", window.location.pathname);
+    if (view || action) window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
   useEffect(() => {
@@ -122,24 +139,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
-  const handleAuthSuccess = (profile: SessionProfile) => {
-    if (!profile || !profile.name) return; // Guard: skip bad/empty profiles
-    try {
-      localStorage.setItem('civic_profile', JSON.stringify(profile));
-    } catch {
-      // private mode -- session cookie still persists login
-    }
-    setUser((prev) => ({
-      ...prev,
-      name: profile.name || prev.name,
-      emailOrHandle: profile.emailOrHandle || prev.emailOrHandle,
-      mobileZa: profile.mobileZa || prev.mobileZa,
-      authChannel: profile.channel || prev.authChannel,
-      signedIn: true,
-    }));
-  };
-
-  const handleSignOut = () => {
+  const handleSignOut = useCallback(() => {
     try {
       localStorage.removeItem('civic_profile');
     } catch {
@@ -147,47 +147,61 @@ export default function App() {
     }
     setUser((prev) => ({ ...prev, signedIn: false }));
     setToastMessage('Signed out.');
-  };
+  }, []);
 
-  const requireAuth = (action: string): boolean => {
-    if (user.signedIn) return true;
-    setAuthModalOpen(true);
-    setToastMessage('Sign in to ' + action + '.');
-    return false;
-  };
+  const requireAuth = useCallback(
+    (action: string): boolean => {
+      if (user.signedIn) return true;
+      setAuthModalOpen(true);
+      setToastMessage('Sign in to ' + action + '.');
+      return false;
+    },
+    [user.signedIn]
+  );
 
-  const activeWard =
-    SEED_WARDS.find((w) => w.id === user.activeWardId) ?? SEED_WARDS[0]!;
+  const activeWard = useMemo(
+    () => SEED_WARDS.find((w) => w.id === user.activeWardId) ?? SEED_WARDS[0]!,
+    [user.activeWardId]
+  );
+
+  const activeTicketCount = useMemo(
+    () => reports.filter((r) => r.status !== 'Resolved').length,
+    [reports]
+  );
 
   const currentPageIdx = PAGE_ORDER.findIndex((p) => p.id === activeView);
-  const goToPrevPage = () => {
+  const goToPrevPage = useCallback(() => {
     const prevIdx = (currentPageIdx - 1 + PAGE_ORDER.length) % PAGE_ORDER.length;
     setActiveView(PAGE_ORDER[prevIdx].id);
-  };
-  const goToNextPage = () => {
+  }, [currentPageIdx]);
+
+  const goToNextPage = useCallback(() => {
     const nextIdx = (currentPageIdx + 1) % PAGE_ORDER.length;
     setActiveView(PAGE_ORDER[nextIdx].id);
-  };
+  }, [currentPageIdx]);
 
-  const pushReward = (title: string, subtitle: string, points: number, type: 'earn' | 'redeem' = 'earn') => {
-    setUser((prev) => ({
-      ...prev,
-      credits: type === 'earn' ? prev.credits + points : Math.max(0, prev.credits - points),
-    }));
-    setTransactions((prev) => [
-      {
-        id: `TX-${Date.now()}`,
-        title,
-        subtitle,
-        points,
-        timestampLabel: 'Just now',
-        type,
-      },
-      ...prev,
-    ]);
-  };
+  const pushReward = useCallback(
+    (title: string, subtitle: string, points: number, type: 'earn' | 'redeem' = 'earn') => {
+      setUser((prev) => ({
+        ...prev,
+        credits: type === 'earn' ? prev.credits + points : Math.max(0, prev.credits - points),
+      }));
+      setTransactions((prev) => [
+        {
+          id: `TX-${Date.now()}`,
+          title,
+          subtitle,
+          points,
+          timestampLabel: 'Just now',
+          type,
+        },
+        ...prev,
+      ]);
+    },
+    []
+  );
 
-  const handleSelectWard = (wardId: string, bindAsHome: boolean) => {
+  const handleSelectWard = useCallback((wardId: string, bindAsHome: boolean) => {
     setUser((prev) => ({
       ...prev,
       activeWardId: wardId,
@@ -198,55 +212,64 @@ export default function App() {
     if (w) {
       setToastMessage(`Active Ward set to ${w.municipalityCode} Ward ${w.wardNumber} (${w.suburbs[0]})`);
     }
-  };
+  }, []);
 
-  const handleSubmitNewReport = (newReport: CivicReport, rewardPoints: number) => {
-    if (!requireAuth('log a fault report')) return;
-    setReports((prev) => [newReport, ...prev]);
-    pushReward(
-      newReport.forensics.status === 'VERIFIED' ? 'Verified Live Capture Report' : 'Civic Fault Logged',
-      `${newReport.id} · ${newReport.title}`,
-      rewardPoints
-    );
-    setToastMessage(`Report ${newReport.id} escalated to ${activeWard.councillor.name} (+${rewardPoints} Civic Credits)`);
-  };
+  const handleSubmitNewReport = useCallback(
+    (newReport: CivicReport, rewardPoints: number) => {
+      if (!requireAuth('log a fault report')) return;
+      setReports((prev) => [newReport, ...prev]);
+      pushReward(
+        newReport.forensics.status === 'VERIFIED' ? 'Verified Live Capture Report' : 'Civic Fault Logged',
+        `${newReport.id} · ${newReport.title}`,
+        rewardPoints
+      );
+      setToastMessage(`Report ${newReport.id} escalated to ${activeWard.councillor.name} (+${rewardPoints} Civic Credits)`);
+    },
+    [requireAuth, pushReward, activeWard.councillor.name]
+  );
 
-  const handleCorroborateReport = (reportId: string) => {
-    if (!requireAuth('link your household')) return;
-    setReports((prev) =>
-      prev.map((r) =>
-        r.id === reportId
-          ? {
-              ...r,
-              clusteredHouseholds: r.clusteredHouseholds + 1,
-              escalationLog: [...r.escalationLog, 'Additional resident household linked to cluster'],
-            }
-          : r
-      )
-    );
-    pushReward('Neighbor Outage Corroboration', `Linked household to ${reportId}`, 15);
-    setToastMessage(`Linked your household to ${reportId} (+15 Civic Credits)`);
-  };
+  const handleCorroborateReport = useCallback(
+    (reportId: string) => {
+      if (!requireAuth('link your household')) return;
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === reportId
+            ? {
+                ...r,
+                clusteredHouseholds: r.clusteredHouseholds + 1,
+                escalationLog: [...r.escalationLog, 'Additional resident household linked to cluster'],
+              }
+            : r
+        )
+      );
+      pushReward('Neighbor Outage Corroboration', `Linked household to ${reportId}`, 15);
+      setToastMessage(`Linked your household to ${reportId} (+15 Civic Credits)`);
+    },
+    [requireAuth, pushReward]
+  );
 
-  const handleVerifyResolution = (reportId: string) => {
-    if (!requireAuth('verify a resolution')) return;
-    setReports((prev) =>
-      prev.map((r) =>
-        r.id === reportId
-          ? {
-              ...r,
-              status: 'Resolved',
-              verifiedByResidents: r.verifiedByResidents + 1,
-              escalationLog: [...r.escalationLog, 'Resident confirmed physical repair completed'],
-            }
-          : r
-      )
-    );
-    pushReward('Verify Resolution Confirmation', `Confirmed street repair on ${reportId}`, 30);
-    setToastMessage(`Resolution verified for ${reportId} (+30 Civic Credits)`);
-  };
+  const handleVerifyResolution = useCallback(
+    (reportId: string) => {
+      if (!requireAuth('verify a resolution')) return;
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === reportId
+            ? {
+                ...r,
+                status: 'Resolved',
+                verifiedByResidents: r.verifiedByResidents + 1,
+                escalationLog: [...r.escalationLog, 'Resident confirmed physical repair completed'],
+              }
+            : r
+        )
+      );
+      pushReward('Verify Resolution Confirmation', `Confirmed street repair on ${reportId}`, 30);
+      setToastMessage(`Resolution verified for ${reportId} (+30 Civic Credits)`);
+    },
+    [requireAuth, pushReward]
+  );
 
-  const handleUpdateStatus = (reportId: string, newStatus: ReportStatus) => {
+  const handleUpdateStatus = useCallback((reportId: string, newStatus: ReportStatus) => {
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId
@@ -259,9 +282,9 @@ export default function App() {
       )
     );
     setToastMessage(`${reportId} updated to ${newStatus}`);
-  };
+  }, []);
 
-  const handleAttachRef = (reportId: string, refCode: string) => {
+  const handleAttachRef = useCallback((reportId: string, refCode: string) => {
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId
@@ -274,9 +297,9 @@ export default function App() {
       )
     );
     setToastMessage(`Attached reference ${refCode} to ${reportId}`);
-  };
+  }, []);
 
-  const handleSendSlaReminder = (reportId: string) => {
+  const handleSendSlaReminder = useCallback((reportId: string) => {
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId
@@ -291,9 +314,9 @@ export default function App() {
       )
     );
     setToastMessage(`SLA follow-up escalation sent for ${reportId}`);
-  };
+  }, []);
 
-  const handleApproveStrippedMedia = (reportId: string) => {
+  const handleApproveStrippedMedia = useCallback((reportId: string) => {
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId
@@ -314,9 +337,9 @@ export default function App() {
       )
     );
     setToastMessage(`${reportId} manually verified and escalated to depot`);
-  };
+  }, []);
 
-  const handleAddSocialItem = (item: SocialPulseItem, matchedReportId?: string | null) => {
+  const handleAddSocialItem = useCallback((item: SocialPulseItem, matchedReportId?: string | null) => {
     setSocialItems((prev) => [item, ...prev]);
     if (matchedReportId) {
       setReports((prev) =>
@@ -334,23 +357,42 @@ export default function App() {
         )
       );
     }
-    setToastMessage(`Ingested ${item.platform} alert via Gemini AI`);
-  };
+    setToastMessage(`Ingested ${item.platform} alert`);
+  }, []);
 
-  const handleLinkRefToSocial = (socialId: string, reportId: string, refCode: string) => {
-    setSocialItems((prev) =>
-      prev.map((s) =>
-        s.id === socialId ? { ...s, linkedReportId: reportId, linkedRef: refCode } : s
-      )
-    );
-    pushReward('Social Outage Thread Link', `Linked ${refCode} to community pulse`, 10);
-    setToastMessage(`Linked ${refCode} to community thread (+10 Civic Credits)`);
-  };
+  const handleLinkRefToSocial = useCallback(
+    (socialId: string, reportId: string, refCode: string) => {
+      setSocialItems((prev) =>
+        prev.map((s) =>
+          s.id === socialId ? { ...s, linkedReportId: reportId, linkedRef: refCode } : s
+        )
+      );
+      pushReward('Social Outage Thread Link', `Linked ${refCode} to community pulse`, 10);
+      setToastMessage(`Linked ${refCode} to community thread (+10 Civic Credits)`);
+    },
+    [pushReward]
+  );
 
-  const activeTicketCount = reports.filter((r) => r.status !== 'Resolved').length;
+  const toggleEmergency = useCallback(() => setEmergencyMode((v) => !v), []);
+  const toggleDarkMode = useCallback(() => setDarkMode((v) => !v), []);
+  const openAuthModal = useCallback(() => setAuthModalOpen(true), []);
+  const openBurgerMenu = useCallback(() => setBurgerOpen(true), []);
+  const openAssistant = useCallback(() => setAssistantOpen(true), []);
+  const openDefaultReportModal = useCallback(() => {
+    setReportCategory('water');
+    setReportModalOpen(true);
+  }, []);
+  const openCategoryReportModal = useCallback((catId: ServiceCategoryId) => {
+    setReportCategory(catId);
+    setReportModalOpen(true);
+  }, []);
+  const openFeed = useCallback(() => setActiveView('feed'), []);
+  const openMap = useCallback(() => setActiveView('map'), []);
+  const openRewards = useCallback(() => setActiveView('rewards'), []);
+  const openProfile = useCallback(() => setActiveView('profile'), []);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#05070B] text-slate-900 dark:text-slate-100 transition-colors flex flex-col">
+    <div className="min-h-dvh bg-[#F8FAFC] dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 transition-colors duration-150 flex flex-col">
       <TopBar
         activeView={activeView}
         onSelectView={setActiveView}
@@ -358,11 +400,11 @@ export default function App() {
         user={user}
         activeTicketCount={activeTicketCount}
         emergencyMode={emergencyMode}
-        onToggleEmergency={() => setEmergencyMode((v) => !v)}
+        onToggleEmergency={toggleEmergency}
         darkMode={darkMode}
-        onToggleDarkMode={() => setDarkMode((v) => !v)}
-        onOpenAuthModal={() => setAuthModalOpen(true)}
-        onOpenBurgerMenu={() => setBurgerOpen(true)}
+        onToggleDarkMode={toggleDarkMode}
+        onOpenAuthModal={openAuthModal}
+        onOpenBurgerMenu={openBurgerMenu}
       />
 
       {/* Swipeable Paged Viewport */}
@@ -391,7 +433,7 @@ export default function App() {
             else goToPrevPage();
           }
         }}
-        className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 pt-3 pb-20 lg:pb-6 flex flex-col gap-3"
+        className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-20 lg:pb-6 flex flex-col gap-3"
       >
         <div className="flex-1 flex flex-col">
           {activeView === 'hub' && (
@@ -400,14 +442,11 @@ export default function App() {
               user={user}
               reportCount={reports.length}
               emergencyMode={emergencyMode}
-              onToggleEmergency={() => setEmergencyMode((v) => !v)}
-              onOpenReportModal={(catId) => {
-                setReportCategory(catId);
-                setReportModalOpen(true);
-              }}
-              onOpenAuthModal={() => setAuthModalOpen(true)}
-              onOpenFeed={() => setActiveView('feed')}
-              onOpenMap={() => setActiveView('map')}
+              onToggleEmergency={toggleEmergency}
+              onOpenReportModal={openCategoryReportModal}
+              onOpenAuthModal={openAuthModal}
+              onOpenFeed={openFeed}
+              onOpenMap={openMap}
               servicesLayout={servicesLayout}
               onChangeServicesLayout={handleChangeServicesLayout}
             />
@@ -419,11 +458,8 @@ export default function App() {
               activeWard={activeWard}
               onCorroborateReport={handleCorroborateReport}
               onVerifyResolution={handleVerifyResolution}
-              onOpenReportModal={() => {
-                setReportCategory('water');
-                setReportModalOpen(true);
-              }}
-              onOpenOnMap={() => setActiveView('map')}
+              onOpenReportModal={openDefaultReportModal}
+              onOpenOnMap={openMap}
             />
           )}
 
@@ -435,10 +471,7 @@ export default function App() {
               onSelectWard={(wardId) => handleSelectWard(wardId, false)}
               onCorroborate={handleCorroborateReport}
               onVerifyResolution={handleVerifyResolution}
-              onOpenReportModal={() => {
-                setReportCategory('water');
-                setReportModalOpen(true);
-              }}
+              onOpenReportModal={openDefaultReportModal}
             />
           )}
 
@@ -494,12 +527,9 @@ export default function App() {
                 );
                 setToastMessage(`Updated ${updated.monthLabel} municipal statement`);
               }}
-              onOpenAuthModal={() => setAuthModalOpen(true)}
-              onOpenReportModal={() => {
-                setReportCategory('water');
-                setReportModalOpen(true);
-              }}
-              onOpenRewards={() => setActiveView('rewards')}
+              onOpenAuthModal={openAuthModal}
+              onOpenReportModal={openDefaultReportModal}
+              onOpenRewards={openRewards}
               onVerifyResolution={handleVerifyResolution}
               onAttachRef={handleAttachRef}
               onSendSlaReminder={handleSendSlaReminder}
@@ -515,15 +545,12 @@ export default function App() {
 
       <FloatingMenu
         emergencyMode={emergencyMode}
-        onOpenReport={() => {
-          setReportCategory('water');
-          setReportModalOpen(true);
-        }}
-        onOpenMap={() => setActiveView('map')}
-        onOpenAssistant={() => setAssistantOpen(true)}
-        onToggleEmergency={() => setEmergencyMode((v) => !v)}
-        onOpenWardPicker={() => setAuthModalOpen(true)}
-        onOpenProfile={() => setActiveView('profile')}
+        onOpenReport={openDefaultReportModal}
+        onOpenMap={openMap}
+        onOpenAssistant={openAssistant}
+        onToggleEmergency={toggleEmergency}
+        onOpenWardPicker={openAuthModal}
+        onOpenProfile={openProfile}
       />
 
       <BurgerMenuDrawer
@@ -534,11 +561,11 @@ export default function App() {
         activeWard={activeWard}
         user={user}
         darkMode={darkMode}
-        onToggleDarkMode={() => setDarkMode((v) => !v)}
+        onToggleDarkMode={toggleDarkMode}
         emergencyMode={emergencyMode}
-        onToggleEmergency={() => setEmergencyMode((v) => !v)}
-        onOpenAuthModal={() => setAuthModalOpen(true)}
-        onOpenAssistant={() => setAssistantOpen(true)}
+        onToggleEmergency={toggleEmergency}
+        onOpenAuthModal={openAuthModal}
+        onOpenAssistant={openAssistant}
       />
 
       <AuthOnboardingModal
@@ -581,7 +608,7 @@ export default function App() {
       {toastMessage && (
         <div
           role="status"
-          className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold shadow-lg max-w-[90vw] text-center"
+          className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold shadow-lg border border-white/10 dark:border-slate-200 max-w-[90vw] text-center ui-modal-enter"
         >
           {toastMessage}
         </div>

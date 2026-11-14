@@ -9,8 +9,7 @@ interface RefBadgeProps {
   className?: string;
 }
 
-/** Municipal reference display with one-tap copy + optional provisional generator. */
-export const RefBadge: React.FC<RefBadgeProps> = ({
+export const RefBadge: React.FC<RefBadgeProps> = React.memo(({
   value,
   onGenerate,
   generateLabel = 'Generate',
@@ -21,12 +20,12 @@ export const RefBadge: React.FC<RefBadgeProps> = ({
   if (!value) {
     return (
       <span className={`inline-flex items-center gap-1.5 ${className}`}>
-        <span className="font-mono text-[11px] text-slate-400">NO REF</span>
+        <span className="font-mono text-[11px] text-slate-400 tabular-nums">No ref</span>
         {onGenerate && (
           <button
             type="button"
             onClick={onGenerate}
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-slate-300 dark:border-white/25 text-[10px] font-semibold text-sky-600 dark:text-sky-400 cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-200/80 dark:border-white/12 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
           >
             <RefreshCw className="w-3 h-3" />
             <span>{generateLabel}</span>
@@ -39,7 +38,7 @@ export const RefBadge: React.FC<RefBadgeProps> = ({
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
       <Hash className="w-3 h-3 text-slate-400 shrink-0" />
-      <span className="font-mono text-[11px] font-semibold text-slate-800 dark:text-slate-100">
+      <span className="font-mono text-[11px] font-semibold text-slate-800 dark:text-slate-100 tabular-nums">
         {value}
       </span>
       <button
@@ -52,10 +51,10 @@ export const RefBadge: React.FC<RefBadgeProps> = ({
         }}
         title="Copy reference number"
         aria-label="Copy reference number"
-        className="p-0.5 text-slate-400 hover:text-sky-500 cursor-pointer"
+        className="p-1 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 transition-[transform,color,background-color] duration-150 cursor-pointer"
       >
-        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+        {copied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
       </button>
     </span>
   );
-};
+});

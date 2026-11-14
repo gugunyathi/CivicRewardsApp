@@ -1,10 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Camera,
   CheckCircle2,
   Loader2,
+  MessageSquare,
   Send,
-  Sparkles,
   Users,
   X,
 } from 'lucide-react';
@@ -43,9 +43,9 @@ interface CivicAssistantDrawerProps {
 }
 
 const SUGGESTED_PROMPTS = [
-  'Water has been gushing out of a pipe on Cedar Road for 3 hours',
-  'How do I dispute an estimated municipal water bill in CoJ?',
-  'Check active outages and tanker schedule for my ward',
+  'Water pipe burst on Cedar Road for 3 hours',
+  'Dispute an estimated CoJ water bill',
+  'Active ward outages and water tankers',
 ];
 
 export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
@@ -60,7 +60,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
     {
       id: 'welcome',
       role: 'assistant',
-      text: `Hello! I'm your CivicRewards AI Assistant for ${activeWard.municipalityName}, Ward ${activeWard.wardNumber} (${activeWard.suburbs.join(', ')}). Describe a fault, upload a photo, or ask about municipal bylaws, billing disputes, or depot escalation rules.`,
+      text: `Ward ${activeWard.wardNumber} (${activeWard.suburbs[0]}) support ready. Describe a fault, attach a photo, or ask about bylaws and billing.`,
     },
   ]);
   const [input, setInput] = useState('');
@@ -71,6 +71,15 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
   } | null>(null);
   const [isSending, setIsSending] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -94,7 +103,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: 'user',
-      text: text || 'Please inspect this municipal fault photo.',
+      text: text || 'Inspect attached fault photo.',
       imagePreview: attachedImage?.preview,
     };
 
@@ -135,7 +144,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Gemini Civic Assistant error.');
+        throw new Error(data.error || 'Ward chat service error.');
       }
 
       setMessages((prev) => [
@@ -155,7 +164,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          text: err instanceof Error ? err.message : 'Unable to reach Civic AI service.',
+          text: err instanceof Error ? err.message : 'Unable to reach civic service.',
         },
       ]);
     } finally {
@@ -191,19 +200,19 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
       isEmergency: draft.severity === 'CRITICAL',
       clusteredHouseholds: 1,
       createdAtIso: new Date().toISOString(),
-      timeAgoLabel: 'Just now (via AI Chat)',
+      timeAgoLabel: 'Just now (via Triage Chat)',
       slaDeadlineHours: 24,
       slaElapsedHours: 0,
       assignedDepot: getDepotForCategory(activeWard, validCat),
-      reporterName: 'You (AI Assistant)',
+      reporterName: 'You (Ward Chat)',
       forensics: {
         status: 'WARNING_STRIPPED_METADATA',
-        summaryLabel: 'Logged via Conversational AI Triage',
+        summaryLabel: 'Logged via Conversational Triage',
         timestampLabel: 'Timestamp: Live Chat Session',
         gpsMatchLabel: `Ward ${activeWard.wardNumber} Bound Pin`,
-        deviceLabel: 'CivicRewards AI Chat',
+        deviceLabel: 'CivicRewards Chat',
         aiSyntheticScorePct: 0,
-        notes: 'Parsed and validated by Gemini Civic Assistant.',
+        notes: 'Parsed and validated via ward triage.',
       },
       escalationLog: [
         `Logged conversationally to Ward ${activeWard.wardNumber}`,
@@ -219,31 +228,38 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="w-full max-w-md h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 dark:bg-slate-950/65 backdrop-blur-sm ui-backdrop-enter"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="w-full max-w-md h-full bg-white dark:bg-[#111827] border-l border-slate-200/80 dark:border-white/[0.08] flex flex-col shadow-2xl ui-drawer-right overscroll-contain">
         {/* Header */}
-        <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between">
           <div>
-            <h2 className="font-display text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-              <span>CivicRewards AI Assistant</span>
+            <h2 className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Ward Triage Assistant</span>
             </h2>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Ward {activeWard.wardNumber} · Bylaws, Depots & Conversational Reporting
+              Ward {activeWard.wardNumber} · Depots, Bylaws & Faults
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close AI assistant"
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 cursor-pointer"
+            aria-label="Close triage assistant"
+            className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-500 cursor-pointer transition-colors duration-150"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Message List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3">
           {messages.map((m) => (
             <div
               key={m.id}
@@ -252,8 +268,8 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
               <div
                 className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed space-y-2 ${
                   m.role === 'user'
-                    ? 'bg-teal-700 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 dark:bg-white/[0.06] text-slate-900 dark:text-slate-100'
                 }`}
               >
                 {m.imagePreview && (
@@ -265,11 +281,10 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
                 )}
                 <p className="whitespace-pre-wrap">{m.text}</p>
 
-                {/* Action Card: Corroborate */}
                 {m.role === 'assistant' &&
                   m.actionType === 'CORROBORATE_EXISTING' &&
                   m.matchedReportId && (
-                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <div className="pt-2 border-t border-slate-200/80 dark:border-white/10">
                       <button
                         type="button"
                         disabled={m.actionExecuted}
@@ -279,35 +294,34 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
                             prev.map((x) => (x.id === m.id ? { ...x, actionExecuted: true } : x))
                           );
                         }}
-                        className="w-full min-h-[38px] px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="w-full min-h-[38px] px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
                       >
                         <Users className="w-3.5 h-3.5" />
                         <span>
                           {m.actionExecuted
                             ? `Linked to ${m.matchedReportId} (+15 cr)`
-                            : `Link to Existing ${m.matchedReportId} (+15 cr)`}
+                            : `Link to ${m.matchedReportId} (+15 cr)`}
                         </span>
                       </button>
                     </div>
                   )}
 
-                {/* Action Card: Create Ticket */}
                 {m.role === 'assistant' && m.actionType === 'CREATE_TICKET' && m.ticketDraft && (
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-white/10 space-y-2">
                     <div className="text-[11px] font-mono opacity-80">
-                      Draft: {m.ticketDraft.title} · {m.ticketDraft.address} ({m.ticketDraft.severity})
+                      {m.ticketDraft.title} · {m.ticketDraft.address} ({m.ticketDraft.severity})
                     </div>
                     <button
                       type="button"
                       disabled={m.actionExecuted}
                       onClick={() => handleConfirmTicket(m.id, m.ticketDraft!)}
-                      className="w-full min-h-[38px] px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full min-h-[38px] px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>
                         {m.actionExecuted
-                          ? 'Ticket Logged to Ward Feed (+40 cr)'
-                          : 'Confirm & Log to Ward Feed (+40 cr)'}
+                          ? 'Ticket Logged (+40 cr)'
+                          : 'Confirm & Log Ticket (+40 cr)'}
                       </span>
                     </button>
                   </div>
@@ -318,20 +332,20 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
 
           {isSending && (
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
-              <span>Checking ward records & municipal bylaws...</span>
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
+              <span>Checking ward records...</span>
             </div>
           )}
         </div>
 
         {/* Suggested Prompts */}
-        <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 flex gap-1.5 overflow-x-auto">
+        <div className="px-4 py-2.5 border-t border-slate-200/80 dark:border-white/[0.08] flex gap-1.5 overflow-x-auto no-scrollbar">
           {SUGGESTED_PROMPTS.map((p, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => void sendMessage(p)}
-              className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] text-slate-700 dark:text-slate-200 whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/[0.05] hover:bg-slate-200 dark:hover:bg-white/10 text-[11px] text-slate-700 dark:text-slate-200 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150"
             >
               {p}
             </button>
@@ -344,13 +358,13 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
             e.preventDefault();
             void sendMessage();
           }}
-          className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2"
+          className="p-3.5 sm:p-4 border-t border-slate-200/80 dark:border-white/[0.08] space-y-2"
         >
           {attachedImage && (
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs">
+            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100 dark:bg-white/[0.05] text-xs">
               <div className="flex items-center gap-2">
-                <img src={attachedImage.preview} alt="Preview" className="w-8 h-8 rounded object-cover" />
-                <span>Photo attached for multimodal triage</span>
+                <img src={attachedImage.preview} alt="Preview" className="w-8 h-8 rounded-lg object-cover" />
+                <span>Photo attached</span>
               </div>
               <button
                 type="button"
@@ -377,7 +391,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
               type="button"
               onClick={() => fileRef.current?.click()}
               aria-label="Attach fault photo"
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+              className="h-11 w-11 flex items-center justify-center rounded-xl border border-slate-200/90 dark:border-white/12 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] cursor-pointer active:scale-95 transition-transform duration-150 shrink-0"
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -386,15 +400,15 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Report a fault or ask a municipal question..."
-              className="flex-1 min-h-[44px] px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
+              placeholder="Report a fault or ask a question..."
+              className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600 transition-[border-color,box-shadow,background-color] duration-150"
             />
 
             <button
               type="submit"
               disabled={isSending || (!input.trim() && !attachedImage)}
               aria-label="Send message"
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white cursor-pointer"
+              className="h-11 w-11 flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white cursor-pointer active:scale-95 transition-[background-color,transform] duration-150 shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>

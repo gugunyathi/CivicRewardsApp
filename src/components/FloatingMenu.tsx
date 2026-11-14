@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   Compass,
@@ -20,7 +20,7 @@ interface FloatingMenuProps {
   onOpenProfile: () => void;
 }
 
-export const FloatingMenu: React.FC<FloatingMenuProps> = ({
+export const FloatingMenu: React.FC<FloatingMenuProps> = React.memo(({
   emergencyMode,
   onOpenReport,
   onOpenMap,
@@ -30,6 +30,15 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
   onOpenProfile,
 }) => {
   const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expanded]);
 
   const actions = [
     {
@@ -48,16 +57,16 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
         setExpanded(false);
         onOpenMap();
       },
-      tone: 'bg-white dark:bg-[#0B111E] text-slate-900 dark:text-white border-slate-200 dark:border-white/20',
+      tone: 'bg-white dark:bg-[#111827] text-slate-900 dark:text-white border-slate-200/80 dark:border-white/12',
     },
     {
-      label: 'Ask Civic AI',
+      label: 'Civic Assistant',
       icon: MessageSquareText,
       onClick: () => {
         setExpanded(false);
         onOpenAssistant();
       },
-      tone: 'bg-white dark:bg-[#0B111E] text-slate-900 dark:text-white border-slate-200 dark:border-white/20',
+      tone: 'bg-white dark:bg-[#111827] text-slate-900 dark:text-white border-slate-200/80 dark:border-white/12',
     },
     {
       label: 'My Profile & Bills',
@@ -66,7 +75,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
         setExpanded(false);
         onOpenProfile();
       },
-      tone: 'bg-white dark:bg-[#0B111E] text-slate-900 dark:text-white border-slate-200 dark:border-white/20',
+      tone: 'bg-white dark:bg-[#111827] text-slate-900 dark:text-white border-slate-200/80 dark:border-white/12',
     },
     {
       label: 'Switch Ward',
@@ -75,7 +84,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
         setExpanded(false);
         onOpenWardPicker();
       },
-      tone: 'bg-white dark:bg-[#0B111E] text-slate-900 dark:text-white border-slate-200 dark:border-white/20',
+      tone: 'bg-white dark:bg-[#111827] text-slate-900 dark:text-white border-slate-200/80 dark:border-white/12',
     },
     {
       label: emergencyMode ? 'Exit SOS' : 'SOS Alert',
@@ -86,7 +95,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
       },
       tone: emergencyMode
         ? 'bg-red-600 text-white border-red-500'
-        : 'bg-white dark:bg-[#0B111E] text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/40',
+        : 'bg-white dark:bg-[#111827] text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30',
     },
   ];
 
@@ -94,7 +103,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
     <>
       {expanded && (
         <div
-          className="fixed inset-0 z-30 bg-black/25 backdrop-blur-[1px]"
+          className="fixed inset-0 z-30 bg-slate-900/30 dark:bg-slate-950/50 backdrop-blur-[2px] ui-backdrop-enter"
           onClick={() => setExpanded(false)}
           aria-hidden="true"
         />
@@ -102,7 +111,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
 
       <div className="fixed bottom-[72px] lg:bottom-6 right-3 sm:right-5 z-40 flex flex-col items-end gap-2">
         {expanded && (
-          <div className="flex flex-col items-end gap-1.5 mb-1">
+          <div className="flex flex-col items-end gap-1.5 mb-1 ui-modal-enter">
             {actions.map((act) => {
               const Icon = act.icon;
               return (
@@ -110,7 +119,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
                   key={act.label}
                   type="button"
                   onClick={act.onClick}
-                  className={`min-h-[42px] px-3.5 py-2 border shadow-lg flex items-center gap-2 transition-transform active:scale-95 cursor-pointer ${
+                  className={`min-h-[42px] px-4 py-2 rounded-xl border shadow-md shadow-slate-900/10 flex items-center gap-2 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer ${
                     act.label === 'REPORT FAULT' ? '' : 'text-xs font-semibold '
                   }${act.tone}`}
                 >
@@ -127,11 +136,11 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-label={expanded ? 'Hide quick floating menu' : 'Show quick floating menu'}
-          className="w-11 h-11 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-950 border border-slate-700 dark:border-white shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
+          className="w-12 h-12 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-950 border border-slate-800/20 dark:border-white/20 shadow-lg shadow-slate-900/20 flex items-center justify-center active:scale-95 transition-transform duration-150 cursor-pointer"
         >
           {expanded ? <X className="w-4 h-4" /> : <Layers className="w-4 h-4" />}
         </button>
       </div>
     </>
   );
-};
+});

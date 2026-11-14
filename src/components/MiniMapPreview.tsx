@@ -13,17 +13,13 @@ interface MiniMapPreviewProps {
   onExpand?: () => void;
 }
 
-/**
- * Lightweight static map thumbnail using free CARTO/OpenStreetMap tiles.
- * No Leaflet instance — safe to render inside cards and lists.
- */
-export const MiniMapPreview: React.FC<MiniMapPreviewProps> = ({
+export const MiniMapPreview: React.FC<MiniMapPreviewProps> = React.memo(({
   lat,
   lng,
   zoom = 13,
   darkMode = true,
   label,
-  pinColor = '#0284c7',
+  pinColor = '#059669',
   className = 'h-28 w-full',
   onExpand,
 }) => {
@@ -31,58 +27,47 @@ export const MiniMapPreview: React.FC<MiniMapPreviewProps> = ({
   const tileUrl = staticTileUrl(lat, lng, zoom, darkMode);
 
   return (
-    <div className={`relative overflow-hidden bg-slate-900 ${className}`}>
+    <div className={`relative overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 ${className}`}>
       {!tileFailed ? (
         <img
           src={tileUrl}
           alt={label ?? `Map near ${lat.toFixed(3)}, ${lng.toFixed(3)}`}
           referrerPolicy="no-referrer"
           loading="lazy"
+          decoding="async"
           onError={() => setTileFailed(true)}
           className="absolute inset-0 w-full h-full object-cover scale-150"
         />
       ) : (
         <div
           aria-hidden="true"
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(56,189,248,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,0.12) 1px, transparent 1px)',
-            backgroundSize: '18px 18px',
-            backgroundColor: darkMode ? '#0a0e17' : '#e2e8f0',
-          }}
+          className="absolute inset-0 bg-slate-200 dark:bg-slate-900"
         />
       )}
 
-      {/* Center pin */}
+      {/* Clean center pin */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="relative flex items-center justify-center">
-          <span
-            className="absolute w-9 h-9 rounded-full opacity-25 animate-ping"
-            style={{ backgroundColor: pinColor }}
-          />
-          <span
-            className="relative w-7 h-7 rounded-full border-2 border-white flex items-center justify-center shadow-lg"
-            style={{ backgroundColor: pinColor }}
-          >
-            <MapPin className="w-3.5 h-3.5 text-white" />
-          </span>
-        </div>
+        <span
+          className="relative w-7 h-7 rounded-full border-2 border-white flex items-center justify-center shadow-sm"
+          style={{ backgroundColor: pinColor }}
+        >
+          <MapPin className="w-3.5 h-3.5 text-white" />
+        </span>
       </div>
 
       {/* Bottom label bar */}
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 px-2 py-1 bg-black/70 text-white">
-        <span className="font-mono text-[10px] truncate">
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 px-2.5 py-1 bg-slate-950/75 text-white">
+        <span className="font-mono text-[10px] truncate tabular-nums">
           {label ?? `${lat.toFixed(4)}, ${lng.toFixed(4)}`}
         </span>
-        <span className="flex items-center gap-1 shrink-0">
+        <span className="flex items-center gap-1.5 shrink-0">
           <a
             href={osmDirectionsUrl(lat, lng)}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
             title="Open in OpenStreetMap"
-            className="font-mono text-[10px] text-sky-300 hover:text-white underline"
+            className="font-mono text-[10px] text-emerald-300 hover:text-white underline"
           >
             OSM
           </a>
@@ -95,7 +80,7 @@ export const MiniMapPreview: React.FC<MiniMapPreviewProps> = ({
               }}
               title="Open live map"
               aria-label="Open live map"
-              className="p-0.5 text-white/90 hover:text-white cursor-pointer"
+              className="p-0.5 text-white/90 hover:text-white active:scale-95 transition-transform cursor-pointer"
             >
               <Expand className="w-3 h-3" />
             </button>
@@ -104,4 +89,4 @@ export const MiniMapPreview: React.FC<MiniMapPreviewProps> = ({
       </div>
     </div>
   );
-};
+});

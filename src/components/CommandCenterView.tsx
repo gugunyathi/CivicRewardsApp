@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -61,7 +61,7 @@ const WHISTLE_CATEGORIES = [
   'Ghost Contractor / Unfinished Repair',
 ];
 
-export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
+export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
   activeWard,
   user,
   reportCount,
@@ -97,7 +97,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
   const metroInfo = MUNICIPALITIES[activeWard.municipalityCode] ?? MUNICIPALITIES['CoJ'];
 
-  const handleCategoryTrigger = (catId: ServiceCategoryId) => {
+  const handleCategoryTrigger = useCallback((catId: ServiceCategoryId) => {
     if (catId === 'accounts' || catId === 'anticorruption' || catId === 'notices') {
       setAccountsStep(1);
       setAccountQuerySent(false);
@@ -108,16 +108,28 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
       return;
     }
     onOpenReportModal(catId);
-  };
+  }, [onOpenReportModal]);
 
-  const closeInfoDrawer = () => {
+  const closeInfoDrawer = useCallback(() => {
     if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current);
     setInfoDrawer(null);
     setWhistleSubmittedRef(null);
     setAccountQuerySent(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!infoDrawer) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeInfoDrawer();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [infoDrawer, closeInfoDrawer]);
 
   const currentNotice = PUBLIC_NOTICES_DATA[noticeIdx] ?? PUBLIC_NOTICES_DATA[0];
+
+  const inputClass =
+    'w-full h-11 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-xs font-mono text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600 dark:focus:ring-emerald-400/25 dark:focus:border-emerald-400 transition-[border-color,box-shadow,background-color] duration-150';
 
   return (
     <div className="flex-1 flex flex-col gap-3 sm:gap-4">
@@ -125,14 +137,14 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
       {emergencyMode && (
         <section
           aria-live="assertive"
-          className="border border-red-500/60 bg-red-600 text-white p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          className="rounded-2xl border border-red-500/40 bg-red-600 text-white p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
         >
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <h2 className="font-display text-sm font-bold">Emergency SOS Mode Active</h2>
-              <p className="text-[11px] text-red-50">
-                Municipal reference bypassed · {metroInfo.name}: {metroInfo.emergencyNumber}
+              <h2 className="font-display text-sm font-bold tracking-tight">Emergency SOS Active</h2>
+              <p className="text-xs text-red-50">
+                Reference bypassed · {metroInfo.name}: {metroInfo.emergencyNumber}
               </p>
             </div>
           </div>
@@ -140,7 +152,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
             <button
               type="button"
               onClick={() => onOpenReportModal('electricity')}
-              className="min-h-[36px] px-3 py-1 bg-white text-red-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
+              className="min-h-[38px] px-3.5 rounded-xl bg-white text-red-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
             >
               <PhoneCall className="w-3.5 h-3.5" />
               <span>Log Emergency</span>
@@ -148,7 +160,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
             <button
               type="button"
               onClick={onToggleEmergency}
-              className="min-h-[36px] px-2.5 border border-red-200/60 text-xs font-semibold cursor-pointer"
+              className="min-h-[38px] px-3 rounded-xl border border-red-200/50 hover:bg-red-700/60 text-xs font-semibold cursor-pointer transition-colors duration-150"
             >
               Exit
             </button>
@@ -160,7 +172,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
       <section className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-            <span className="text-sky-600 dark:text-sky-400 font-semibold">
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
               WARD {activeWard.wardNumber} · {activeWard.municipalityCode}
             </span>
             <span aria-hidden="true">/</span>
@@ -177,9 +189,9 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
           <button
             type="button"
             onClick={onOpenAuthModal}
-            className="min-h-[36px] px-2.5 border border-slate-200 dark:border-white/15 hover:border-slate-900 dark:hover:border-white text-xs text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+            className="min-h-[38px] px-3 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150"
           >
-            <MapPin className="w-3.5 h-3.5 text-sky-500" />
+            <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden sm:inline">{activeWard.councillor.name}</span>
             <span className="sm:hidden">Ward</span>
           </button>
@@ -187,25 +199,25 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
           <button
             type="button"
             onClick={onOpenFeed}
-            className="min-h-[36px] px-2.5 border border-slate-200 dark:border-white/15 hover:border-slate-900 dark:hover:border-white text-xs text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+            className="min-h-[38px] px-3 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150 tabular-nums"
           >
-            <Layers className="w-3.5 h-3.5 text-sky-500" />
+            <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Feed ({reportCount})</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenMap}
-            className="min-h-[36px] px-2.5 border border-slate-200 dark:border-white/15 hover:border-slate-900 dark:hover:border-white text-xs text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+            className="min-h-[38px] px-3 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150"
           >
-            <MapIcon className="w-3.5 h-3.5 text-sky-500" />
+            <MapIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Map</span>
           </button>
 
           <div
             role="group"
             aria-label="Service cards layout"
-            className="flex items-center border border-slate-200 dark:border-white/15 bg-slate-100 dark:bg-white/5 p-0.5"
+            className="flex items-center rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-100/80 dark:bg-white/[0.04] p-0.5"
           >
             <button
               type="button"
@@ -213,10 +225,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
               aria-pressed={servicesLayout === 'carousel'}
               aria-label="Default carousel layout"
               title="Default layout"
-              className={`min-h-[32px] px-2 text-[11px] sm:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`min-h-[32px] px-2.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors duration-150 ${
                 servicesLayout === 'carousel'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-white dark:text-slate-950'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <GalleryHorizontalEnd className="w-3.5 h-3.5 shrink-0" />
@@ -228,10 +240,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
               aria-pressed={servicesLayout === 'tiles'}
               aria-label="Tiles grid layout"
               title="Tiles layout"
-              className={`min-h-[32px] px-2 text-[11px] sm:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`min-h-[32px] px-2.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors duration-150 ${
                 servicesLayout === 'tiles'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-white dark:text-slate-950'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
@@ -263,50 +275,50 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
       {/* Survey-Style Guided Modal Drawers for Categories 8, 9, 10 */}
       {infoDrawer && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm p-0 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeInfoDrawer();
+          }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 dark:bg-slate-950/65 backdrop-blur-sm ui-backdrop-enter p-0 sm:p-4"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-xl h-[82dvh] sm:h-[520px] max-h-[90dvh] flex flex-col bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 overflow-hidden">
+          <div className="w-full max-w-xl h-[84dvh] sm:h-[540px] max-h-[90dvh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] shadow-2xl overflow-hidden ui-modal-enter overscroll-contain">
             {/* Pinned Header */}
-            <div className="shrink-0 px-4 py-3.5 border-b border-slate-200 dark:border-white/12 flex items-center justify-between gap-2">
+            <div className="shrink-0 px-5 sm:px-6 py-4 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <div className="font-mono text-[10px] text-sky-600 dark:text-sky-400 uppercase tracking-wider">
-                  {infoDrawer === 'accounts' && `Step 0${accountsStep} / 03 · ${activeWard.municipalityCode} Revenue`}
-                  {infoDrawer === 'anticorruption' && `Step 0${whistleStep} / 03 · GFIS Encrypted`}
-                  {infoDrawer === 'notices' && `Notice ${noticeIdx + 1} / ${PUBLIC_NOTICES_DATA.length} · Civic Notices`}
+                <div className="font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider tabular-nums">
+                  {infoDrawer === 'accounts' && `Step ${accountsStep} of 3 · ${activeWard.municipalityCode} Revenue`}
+                  {infoDrawer === 'anticorruption' && `Step ${whistleStep} of 3 · Encrypted Channel`}
+                  {infoDrawer === 'notices' && `Notice ${noticeIdx + 1} of ${PUBLIC_NOTICES_DATA.length}`}
                 </div>
-                <h3 className="font-display text-base font-bold text-slate-900 dark:text-white truncate">
+                <h3 className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
                   {infoDrawer === 'accounts' && 'Municipal Accounts & Debt Relief'}
-                  {infoDrawer === 'anticorruption' && 'Anti-Corruption Whistleblowing'}
-                  {infoDrawer === 'notices' && 'Public Notices, Bylaws & Voter Info'}
+                  {infoDrawer === 'anticorruption' && 'Anti-Corruption Reporting'}
+                  {infoDrawer === 'notices' && 'Public Notices & Bylaws'}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={closeInfoDrawer}
                 aria-label="Close module"
-                className="min-h-[40px] min-w-[40px] flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 cursor-pointer shrink-0"
+                className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-500 cursor-pointer transition-colors duration-150 shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Guided Survey Body */}
-            <div className="flex-1 p-4 flex flex-col justify-between gap-3 overflow-hidden">
+            <div className="flex-1 p-5 sm:p-6 flex flex-col justify-between gap-3 overflow-y-auto overscroll-contain">
               {infoDrawer === 'accounts' && (
                 <>
-                  {/* Step progress bars */}
                   <div className="grid grid-cols-3 gap-1.5 shrink-0">
                     {[1, 2, 3].map((n) => (
                       <div
                         key={n}
-                        className={`h-1.5 ${
-                          n === accountsStep
-                            ? 'bg-sky-500'
-                            : n < accountsStep
-                              ? 'bg-emerald-500'
-                              : 'bg-slate-200 dark:bg-white/15'
+                        className={`h-1.5 rounded-full transition-colors duration-200 ${
+                          n <= accountsStep
+                            ? 'bg-emerald-600 dark:bg-emerald-400'
+                            : 'bg-slate-200 dark:bg-white/10'
                         }`}
                       />
                     ))}
@@ -314,11 +326,11 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
                   {accountsStep === 1 && (
                     <div className="flex-1 flex flex-col justify-center gap-2.5">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                        What is your combined monthly household income?
+                      <div className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">
+                        Monthly household income bracket
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Tap a bracket to check {activeWard.municipalityName} debt relief & advance automatically.
+                        Select a bracket to check {activeWard.municipalityName} rebate eligibility.
                       </p>
                       <div className="grid grid-cols-1 gap-2 pt-1">
                         {INCOME_BRACKETS.map((b) => (
@@ -327,16 +339,16 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                             type="button"
                             onClick={() => {
                               setIncomeBracket(b);
-                              autoTimerRef.current = window.setTimeout(() => setAccountsStep(2), 200);
+                              autoTimerRef.current = window.setTimeout(() => setAccountsStep(2), 180);
                             }}
-                            className={`p-3 border text-left flex items-center justify-between cursor-pointer ${
+                            className={`p-3.5 rounded-xl border text-left flex items-center justify-between cursor-pointer active:scale-[0.98] transition-[border-color,background-color,transform] duration-150 ${
                               incomeBracket.id === b.id
-                                ? 'border-sky-500 bg-sky-500/15 text-slate-900 dark:text-white'
-                                : 'border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/[0.03] hover:border-sky-500'
+                                ? 'border-emerald-600 bg-emerald-600/10 text-slate-900 dark:border-emerald-400 dark:bg-emerald-400/10 dark:text-white'
+                                : 'border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] hover:border-emerald-600/50'
                             }`}
                           >
-                            <span className="text-xs font-bold">{b.label}</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-sky-500" />
+                            <span className="text-xs font-semibold">{b.label}</span>
+                            <ArrowRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                           </button>
                         ))}
                       </div>
@@ -344,9 +356,9 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   )}
 
                   {accountsStep === 2 && (
-                    <div className="flex-1 flex flex-col justify-between gap-2.5">
-                      <div className="space-y-1.5">
-                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                    <div className="flex-1 flex flex-col justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">
                           What do you need help with?
                         </div>
                         <div className="grid grid-cols-1 gap-1.5">
@@ -355,10 +367,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                               key={qt}
                               type="button"
                               onClick={() => setAccountQueryType(qt)}
-                              className={`px-3 py-2 border text-left text-xs font-medium cursor-pointer ${
+                              className={`px-3.5 py-2.5 rounded-xl border text-left text-xs font-medium cursor-pointer active:scale-[0.98] transition-[border-color,background-color,transform] duration-150 ${
                                 accountQueryType === qt
-                                  ? 'border-sky-500 bg-sky-500 text-white'
-                                  : 'border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200'
+                                  ? 'border-emerald-600 bg-emerald-600 text-white'
+                                  : 'border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] text-slate-800 dark:text-slate-200 hover:border-slate-300'
                               }`}
                             >
                               {qt}
@@ -367,9 +379,9 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <div>
-                          <label className="block text-[10px] font-mono text-slate-400 mb-0.5">
+                          <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
                             9-Digit Account #
                           </label>
                           <input
@@ -377,19 +389,19 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                             value={accountNumber}
                             onChange={(e) => setAccountNumber(e.target.value)}
                             placeholder="900412881"
-                            className="w-full min-h-[38px] px-2.5 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-xs font-mono"
+                            className={inputClass}
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-mono text-slate-400 mb-0.5">
-                            Meter Reading (Optional)
+                          <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+                            Meter Reading
                           </label>
                           <input
                             type="text"
                             value={meterReading}
                             onChange={(e) => setMeterReading(e.target.value)}
                             placeholder="e.g. 04182 kL"
-                            className="w-full min-h-[38px] px-2.5 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-xs font-mono"
+                            className={inputClass}
                           />
                         </div>
                       </div>
@@ -397,47 +409,47 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   )}
 
                   {accountsStep === 3 && (
-                    <div className="flex-1 flex flex-col justify-between gap-2.5">
-                      <div className="p-3 bg-sky-500/10 border border-sky-500/30 space-y-1">
-                        <div className="font-mono text-[10px] text-sky-600 dark:text-sky-400">
-                          ELIGIBILITY MATCH · {activeWard.municipalityCode}
+                    <div className="flex-1 flex flex-col justify-between gap-3">
+                      <div className="p-3.5 rounded-xl bg-emerald-600/10 border border-emerald-600/25 dark:bg-emerald-400/10 dark:border-emerald-400/25 space-y-1">
+                        <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                          Eligibility Match · {activeWard.municipalityCode}
                         </div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
                           {incomeBracket.plan}
                         </div>
                       </div>
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <button
                           type="button"
                           onClick={() => setAccountsStep(1)}
-                          className="w-full p-2.5 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/[0.03] text-left flex items-center justify-between cursor-pointer"
+                          className="w-full p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] text-left flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform duration-150"
                         >
                           <div>
-                            <div className="font-mono text-[10px] text-slate-400">01 · HOUSEHOLD INCOME</div>
-                            <div className="text-xs font-semibold">{incomeBracket.label}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">Household Income</div>
+                            <div className="text-xs font-semibold text-slate-900 dark:text-white">{incomeBracket.label}</div>
                           </div>
-                          <Pencil className="w-3.5 h-3.5 text-sky-500" />
+                          <Pencil className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setAccountsStep(2)}
-                          className="w-full p-2.5 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/[0.03] text-left flex items-center justify-between cursor-pointer"
+                          className="w-full p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] text-left flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform duration-150"
                         >
                           <div className="min-w-0">
-                            <div className="font-mono text-[10px] text-slate-400">02 · QUERY & ACCOUNT</div>
-                            <div className="text-xs font-semibold truncate">
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">Query & Account</div>
+                            <div className="text-xs font-semibold text-slate-900 dark:text-white truncate tabular-nums">
                               {accountQueryType} · #{accountNumber || '900412881'}
                               {meterReading ? ` (${meterReading})` : ''}
                             </div>
                           </div>
-                          <Pencil className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                          <Pencil className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                         </button>
                       </div>
 
                       {accountQuerySent && (
-                        <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/40 text-xs font-mono text-emerald-700 dark:text-emerald-300">
+                        <div className="p-3 rounded-xl bg-emerald-600/10 border border-emerald-600/30 text-xs font-mono text-emerald-700 dark:text-emerald-300 tabular-nums">
                           Logged: {activeWard.municipalityCode}-REV-{accountNumber || '900412881'}
                         </div>
                       )}
@@ -452,12 +464,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                     {[1, 2, 3].map((n) => (
                       <div
                         key={n}
-                        className={`h-1.5 ${
-                          n === whistleStep
-                            ? 'bg-sky-500'
-                            : n < whistleStep
-                              ? 'bg-emerald-500'
-                              : 'bg-slate-200 dark:bg-white/15'
+                        className={`h-1.5 rounded-full transition-colors duration-200 ${
+                          n <= whistleStep
+                            ? 'bg-emerald-600 dark:bg-emerald-400'
+                            : 'bg-slate-200 dark:bg-white/10'
                         }`}
                       />
                     ))}
@@ -465,12 +475,12 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
                   {whistleStep === 1 && (
                     <div className="flex-1 flex flex-col justify-center gap-2.5">
-                      <div className="p-2.5 bg-slate-100 dark:bg-white/5 text-xs flex items-center gap-2">
-                        <Lock className="w-4 h-4 text-sky-500 shrink-0" />
-                        <span>Zero-identity channel to GFIS & 0800 701 701.</span>
+                      <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Anonymous channel to GFIS & 0800 701 701.</span>
                       </div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                        What type of irregularity are you reporting?
+                      <div className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">
+                        Select irregularity type
                       </div>
                       <div className="grid grid-cols-1 gap-2">
                         {WHISTLE_CATEGORIES.map((cat) => (
@@ -479,16 +489,16 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                             type="button"
                             onClick={() => {
                               setWhistleCategory(cat);
-                              autoTimerRef.current = window.setTimeout(() => setWhistleStep(2), 200);
+                              autoTimerRef.current = window.setTimeout(() => setWhistleStep(2), 180);
                             }}
-                            className={`p-3 border text-left flex items-center justify-between cursor-pointer ${
+                            className={`p-3.5 rounded-xl border text-left flex items-center justify-between cursor-pointer active:scale-[0.98] transition-[border-color,background-color,transform] duration-150 ${
                               whistleCategory === cat
-                                ? 'border-sky-500 bg-sky-500/15 text-slate-900 dark:text-white'
-                                : 'border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/[0.03] hover:border-sky-500'
+                                ? 'border-emerald-600 bg-emerald-600/10 text-slate-900 dark:border-emerald-400 dark:bg-emerald-400/10 dark:text-white'
+                                : 'border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] hover:border-emerald-600/50'
                             }`}
                           >
-                            <span className="text-xs font-bold">{cat}</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-sky-500" />
+                            <span className="text-xs font-semibold">{cat}</span>
+                            <ArrowRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                           </button>
                         ))}
                       </div>
@@ -497,55 +507,55 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
                   {whistleStep === 2 && (
                     <div className="flex-1 flex flex-col justify-center gap-2.5">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                      <div className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">
                         Describe the incident anonymously
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Do not include your name or phone number. Include depot, vehicle reg, or dates if known.
+                        Omit personal names. Include depot, vehicle plate, or date if known.
                       </p>
                       <textarea
                         rows={5}
                         value={whistleText}
                         onChange={(e) => setWhistleText(e.target.value)}
                         placeholder={`Details for "${whistleCategory}" in Ward ${activeWard.wardNumber}...`}
-                        className="w-full p-3 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#05070B] text-sm"
+                        className="w-full p-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600 transition-[border-color,box-shadow,background-color] duration-150"
                       />
                     </div>
                   )}
 
                   {whistleStep === 3 && (
-                    <div className="flex-1 flex flex-col justify-between gap-2.5">
+                    <div className="flex-1 flex flex-col justify-between gap-3">
                       <div className="space-y-2">
                         <button
                           type="button"
                           onClick={() => setWhistleStep(1)}
-                          className="w-full p-3 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/[0.03] text-left flex items-center justify-between cursor-pointer"
+                          className="w-full p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] text-left flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform duration-150"
                         >
                           <div>
-                            <div className="font-mono text-[10px] text-slate-400">01 · CATEGORY</div>
-                            <div className="text-xs font-bold">{whistleCategory}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">Category</div>
+                            <div className="text-xs font-semibold text-slate-900 dark:text-white">{whistleCategory}</div>
                           </div>
-                          <Pencil className="w-3.5 h-3.5 text-sky-500" />
+                          <Pencil className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setWhistleStep(2)}
-                          className="w-full p-3 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/[0.03] text-left flex items-center justify-between gap-2 cursor-pointer"
+                          className="w-full p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/70 dark:bg-white/[0.03] text-left flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] transition-transform duration-150"
                         >
                           <div className="min-w-0">
-                            <div className="font-mono text-[10px] text-slate-400">02 · ENCRYPTED STATEMENT</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">Encrypted Statement</div>
                             <div className="text-xs text-slate-700 dark:text-slate-200 line-clamp-2">
                               {whistleText.trim() || 'Anonymous tip ready for GFIS submission'}
                             </div>
                           </div>
-                          <Pencil className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                          <Pencil className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                         </button>
                       </div>
 
                       {whistleSubmittedRef && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/40 text-xs text-emerald-700 dark:text-emerald-300 font-mono">
-                          Encrypted Token: {whistleSubmittedRef} · Zero identity metadata stored.
+                        <div className="p-3 rounded-xl bg-emerald-600/10 border border-emerald-600/30 text-xs text-emerald-700 dark:text-emerald-300 font-mono tabular-nums">
+                          Token: {whistleSubmittedRef} · Zero identity metadata stored.
                         </div>
                       )}
                     </div>
@@ -555,15 +565,15 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
               {infoDrawer === 'notices' && currentNotice && (
                 <div className="flex-1 flex flex-col justify-between gap-3">
-                  <div className="p-4 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/12 space-y-2.5 flex-1 flex flex-col justify-center">
+                  <div className="p-5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/[0.08] space-y-2.5 flex-1 flex flex-col justify-center">
                     <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="font-semibold text-sky-600 dark:text-sky-400">
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                         {currentNotice.municipality} · {currentNotice.tag}
                       </span>
-                      <span className="text-slate-400">{currentNotice.date}</span>
+                      <span className="text-slate-400 tabular-nums">{currentNotice.date}</span>
                     </div>
-                    <div className="text-base font-display font-bold text-slate-900 dark:text-white flex items-start gap-2">
-                      <FileText className="w-4 h-4 text-sky-500 shrink-0 mt-1" />
+                    <div className="text-base font-display font-bold tracking-tight text-slate-900 dark:text-white flex items-start gap-2">
+                      <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-1" />
                       <span>{currentNotice.title}</span>
                     </div>
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -577,7 +587,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                       onClick={() =>
                         setNoticeIdx((i) => (i - 1 + PUBLIC_NOTICES_DATA.length) % PUBLIC_NOTICES_DATA.length)
                       }
-                      className="min-h-[40px] px-3 border border-slate-200 dark:border-white/20 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      className="min-h-[40px] px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                     >
                       <ChevronLeft className="w-4 h-4" />
                       <span>Prev</span>
@@ -590,7 +600,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setNoticeIdx((i) => (i + 1) % PUBLIC_NOTICES_DATA.length)}
-                      className="min-h-[40px] px-3 border border-slate-200 dark:border-white/20 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      className="min-h-[40px] px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                     >
                       <span>Next</span>
                       <ChevronRight className="w-4 h-4" />
@@ -602,7 +612,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
             {/* Pinned Drawer Footer */}
             {infoDrawer !== 'notices' && (
-              <div className="shrink-0 px-4 py-3 border-t border-slate-200 dark:border-white/12 flex items-center justify-between gap-2">
+              <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-2">
                 {((infoDrawer === 'accounts' && accountsStep > 1) ||
                   (infoDrawer === 'anticorruption' && whistleStep > 1)) ? (
                   <button
@@ -611,7 +621,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                       if (infoDrawer === 'accounts') setAccountsStep((s) => (s - 1) as 1 | 2 | 3);
                       if (infoDrawer === 'anticorruption') setWhistleStep((s) => (s - 1) as 1 | 2 | 3);
                     }}
-                    className="min-h-[40px] px-3.5 border border-slate-200 dark:border-white/20 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    className="min-h-[42px] px-4 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Back</span>
@@ -620,7 +630,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   <button
                     type="button"
                     onClick={closeInfoDrawer}
-                    className="min-h-[40px] px-3.5 border border-slate-200 dark:border-white/20 text-xs font-semibold cursor-pointer"
+                    className="min-h-[42px] px-4 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                   >
                     Close
                   </button>
@@ -630,7 +640,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setAccountsStep((s) => (s + 1) as 1 | 2 | 3)}
-                    className="min-h-[40px] px-4 bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[42px] px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                   >
                     <span>{accountsStep === 2 ? 'Review Summary' : 'Next'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -641,7 +651,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setAccountQuerySent(true)}
-                    className="min-h-[40px] px-4 bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[42px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Submit Revenue Query</span>
@@ -652,7 +662,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setWhistleStep((s) => (s + 1) as 1 | 2 | 3)}
-                    className="min-h-[40px] px-4 bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[42px] px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                   >
                     <span>{whistleStep === 2 ? 'Review Tip' : 'Next'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -665,7 +675,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                     onClick={() => {
                       setWhistleSubmittedRef(`GFIS-${Math.floor(100000 + Math.random() * 900000)}`);
                     }}
-                    className="min-h-[40px] px-4 bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[42px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
                   >
                     <Lock className="w-3.5 h-3.5" />
                     <span>Encrypt & Submit Tip</span>
@@ -678,4 +688,6 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
       )}
     </div>
   );
-};
+});
+
+CommandCenterView.displayName = 'CommandCenterView';

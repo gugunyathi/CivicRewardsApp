@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Award,
   BarChart3,
@@ -91,7 +91,10 @@ const getBenchmarkMetricValue = (
   }
 };
 
-export const UserProfileView: React.FC<UserProfileViewProps> = ({
+const billInputClass =
+  'w-full h-10 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-xs font-mono tabular-nums text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600 transition-[border-color,box-shadow,background-color] duration-150';
+
+export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
   user,
   activeWard,
   reports,
@@ -107,15 +110,12 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 }) => {
   const [tab, setTab] = useState<ProfileTab>('reports');
 
-  // Reports tab state
   const [reportFilter, setReportFilter] = useState<'all' | 'active' | 'resolved'>('all');
   const [reportPage, setReportPage] = useState(0);
 
-  // Points tab state
   const [txFilter, setTxFilter] = useState<'all' | 'earn' | 'redeem'>('all');
   const [txPage, setTxPage] = useState(0);
 
-  // Monthly bills tab state
   const [billMetric, setBillMetric] = useState<BillMetric>('total');
   const [selectedMonthIdx, setSelectedMonthIdx] = useState(Math.max(0, monthlyBills.length - 1));
   const [editingBill, setEditingBill] = useState(false);
@@ -126,44 +126,57 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [draftRates, setDraftRates] = useState(String(latestBill?.ratesZar ?? 1850));
   const [draftTaxes, setDraftTaxes] = useState(String(latestBill?.municipalTaxesZar ?? 490));
 
-  // Compare Wards & Towns tab state
   const [compareMetric, setCompareMetric] = useState<BillMetric>('total');
-  const [benchmarkIdx, setBenchmarkIdx] = useState(3); // Default Sea Point Cape Town vs user's Fourways W115
+  const [benchmarkIdx, setBenchmarkIdx] = useState(3);
 
-  // Filter reports belonging to this user (their authored reports or ward activity)
-  const myReports = reports.filter(
-    (r) =>
-      r.reporterName === user.name ||
-      r.reporterName === 'You (Ward Resident)' ||
-      r.reporterName === 'Gugu Ndlovu' ||
-      r.timeAgoLabel === 'Just now' ||
-      r.id === 'CP-2026-1041'
+  const myReports = useMemo(
+    () =>
+      reports.filter(
+        (r) =>
+          r.reporterName === user.name ||
+          r.reporterName === 'You (Ward Resident)' ||
+          r.reporterName === 'Gugu Ndlovu' ||
+          r.timeAgoLabel === 'Just now' ||
+          r.id === 'CP-2026-1041'
+      ),
+    [reports, user.name]
   );
-  const resolvedCount = myReports.filter((r) => r.status === 'Resolved').length;
 
-  const filteredReports = myReports.filter((r) => {
-    if (reportFilter === 'active') return r.status !== 'Resolved';
-    if (reportFilter === 'resolved') return r.status === 'Resolved';
-    return true;
-  });
+  const resolvedCount = useMemo(
+    () => myReports.filter((r) => r.status === 'Resolved').length,
+    [myReports]
+  );
+
+  const filteredReports = useMemo(
+    () =>
+      myReports.filter((r) => {
+        if (reportFilter === 'active') return r.status !== 'Resolved';
+        if (reportFilter === 'resolved') return r.status === 'Resolved';
+        return true;
+      }),
+    [myReports, reportFilter]
+  );
+
   const repTotalPages = Math.max(1, Math.ceil(filteredReports.length / 2));
   const safeRepPage = Math.min(reportPage, repTotalPages - 1);
   const visibleReports = filteredReports.slice(safeRepPage * 2, safeRepPage * 2 + 2);
 
-  // Points & cashouts
-  const totalEarned = transactions
-    .filter((t) => t.type === 'earn')
-    .reduce((acc, t) => acc + t.points, 0);
-  const totalCashedOut = transactions
-    .filter((t) => t.type === 'redeem')
-    .reduce((acc, t) => acc + t.points, 0);
+  const { totalEarned, totalCashedOut } = useMemo(
+    () => ({
+      totalEarned: transactions.filter((t) => t.type === 'earn').reduce((acc, t) => acc + t.points, 0),
+      totalCashedOut: transactions.filter((t) => t.type === 'redeem').reduce((acc, t) => acc + t.points, 0),
+    }),
+    [transactions]
+  );
 
-  const filteredTx = transactions.filter((t) => (txFilter === 'all' ? true : t.type === txFilter));
+  const filteredTx = useMemo(
+    () => transactions.filter((t) => (txFilter === 'all' ? true : t.type === txFilter)),
+    [transactions, txFilter]
+  );
   const txTotalPages = Math.max(1, Math.ceil(filteredTx.length / 3));
   const safeTxPage = Math.min(txPage, txTotalPages - 1);
   const visibleTx = filteredTx.slice(safeTxPage * 3, safeTxPage * 3 + 3);
 
-  // Monthly bills chart math
   const safeMonthIdx = Math.min(selectedMonthIdx, Math.max(0, monthlyBills.length - 1));
   const activeBill = monthlyBills[safeMonthIdx] ?? latestBill;
   const prevBill = safeMonthIdx > 0 ? monthlyBills[safeMonthIdx - 1] : null;
@@ -176,7 +189,6 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const momDeltaPct =
     prevMetricVal > 0 ? Math.round(((activeMetricVal - prevMetricVal) / prevMetricVal) * 1000) / 10 : 0;
 
-  // Comparison math
   const homeAvgBench = SEED_WARD_TOWN_BENCHMARKS[0];
   const compareBench = SEED_WARD_TOWN_BENCHMARKS[benchmarkIdx] ?? SEED_WARD_TOWN_BENCHMARKS[1];
   const userLatestVal = latestBill ? getBillMetricValue(latestBill, compareMetric) : 0;
@@ -206,34 +218,34 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   };
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
       {/* Compact Citizen Profile Banner */}
-      <section className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-3.5 sm:p-4 space-y-3">
+      <section className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 sm:p-5 space-y-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 bg-sky-600 text-white font-display font-bold text-sm flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white font-display font-bold text-sm flex items-center justify-center shrink-0">
               {initials || <User className="w-5 h-5" />}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="font-display text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
+                <h1 className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
                   {user.name}
                 </h1>
                 <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400 font-semibold shrink-0">
                   {user.tier}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                {activeWard.municipalityCode} Ward {activeWard.wardNumber} ({activeWard.suburbs[0]}) · {user.mobileZa}
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate tabular-nums">
+                {activeWard.municipalityCode} Ward {activeWard.wardNumber} ({activeWard.suburbs[0]}) · {user.mobileZa || 'Guest'}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={onOpenAuthModal}
-              className="min-h-[36px] px-2.5 border border-slate-200 dark:border-white/15 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
+              className="min-h-[38px] px-3 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
             >
               <Settings className="w-3.5 h-3.5" />
               <span>Account</span>
@@ -241,7 +253,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <button
               type="button"
               onClick={onOpenReportModal}
-              className="min-h-[36px] px-3 bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-extrabold uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+              className="min-h-[38px] px-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-extrabold uppercase tracking-wider flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
             >
               <Plus className="w-3.5 h-3.5 stroke-[3]" />
               <span>REPORT</span>
@@ -250,11 +262,11 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </div>
 
         {/* 4 Single-Row Summary KPIs */}
-        <div className="grid grid-cols-4 gap-1.5 pt-1 border-t border-slate-100 dark:border-white/10">
+        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
           <button
             type="button"
             onClick={() => setTab('reports')}
-            className="p-2 bg-slate-50 dark:bg-white/[0.03] text-left cursor-pointer hover:border-sky-500 border border-transparent"
+            className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] text-left cursor-pointer hover:border-emerald-600/50 border border-transparent transition-colors duration-150"
           >
             <div className="font-mono text-[10px] text-slate-400">REPORTS</div>
             <div className="font-display text-sm sm:text-base font-bold tabular-nums text-slate-900 dark:text-white">
@@ -268,7 +280,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               setReportFilter('resolved');
               setReportPage(0);
             }}
-            className="p-2 bg-slate-50 dark:bg-white/[0.03] text-left cursor-pointer hover:border-sky-500 border border-transparent"
+            className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] text-left cursor-pointer hover:border-emerald-600/50 border border-transparent transition-colors duration-150"
           >
             <div className="font-mono text-[10px] text-slate-400">RESOLVED</div>
             <div className="font-display text-sm sm:text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
@@ -282,7 +294,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               setTxFilter('earn');
               setTxPage(0);
             }}
-            className="p-2 bg-slate-50 dark:bg-white/[0.03] text-left cursor-pointer hover:border-sky-500 border border-transparent"
+            className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] text-left cursor-pointer hover:border-emerald-600/50 border border-transparent transition-colors duration-150"
           >
             <div className="font-mono text-[10px] text-slate-400">EARNED</div>
             <div className="font-display text-sm sm:text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">
@@ -296,10 +308,10 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               setTxFilter('redeem');
               setTxPage(0);
             }}
-            className="p-2 bg-slate-50 dark:bg-white/[0.03] text-left cursor-pointer hover:border-sky-500 border border-transparent"
+            className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] text-left cursor-pointer hover:border-emerald-600/50 border border-transparent transition-colors duration-150"
           >
             <div className="font-mono text-[10px] text-slate-400">CASHED OUT</div>
-            <div className="font-display text-sm sm:text-base font-bold tabular-nums text-sky-600 dark:text-sky-400">
+            <div className="font-display text-sm sm:text-base font-bold tabular-nums text-slate-700 dark:text-slate-200">
               -{totalCashedOut}
             </div>
           </button>
@@ -307,7 +319,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       </section>
 
       {/* 4 Segmented Navigation Tabs */}
-      <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/15">
+      <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-slate-100/80 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/[0.08]">
         {(
           [
             { id: 'reports', label: 'Reports', icon: FileCheck2 },
@@ -323,9 +335,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`min-h-[38px] px-1.5 flex items-center justify-center gap-1 text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer ${
+              className={`min-h-[38px] px-2 rounded-lg flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold transition-colors duration-150 cursor-pointer ${
                 active
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-white dark:text-slate-950'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -340,7 +352,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {tab === 'reports' && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {(
                 [
                   { id: 'all', label: `All (${myReports.length})` },
@@ -355,10 +367,10 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     setReportFilter(f.id);
                     setReportPage(0);
                   }}
-                  className={`min-h-[32px] px-2.5 text-xs font-mono cursor-pointer ${
+                  className={`min-h-[34px] px-3 rounded-xl text-xs font-mono cursor-pointer transition-colors duration-150 tabular-nums ${
                     reportFilter === f.id
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
-                      : 'border border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-300'
+                      : 'border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   {f.label}
@@ -367,14 +379,14 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[11px] text-slate-400">
+              <span className="font-mono text-[11px] text-slate-400 tabular-nums">
                 {safeRepPage + 1} / {repTotalPages}
               </span>
               <button
                 type="button"
                 disabled={safeRepPage === 0}
                 onClick={() => setReportPage((p) => Math.max(0, p - 1))}
-                className="min-h-[32px] min-w-[32px] flex items-center justify-center border border-slate-200 dark:border-white/15 disabled:opacity-35 cursor-pointer"
+                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -382,27 +394,27 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 type="button"
                 disabled={safeRepPage >= repTotalPages - 1}
                 onClick={() => setReportPage((p) => Math.min(repTotalPages - 1, p + 1))}
-                className="min-h-[32px] min-w-[32px] flex items-center justify-center border border-slate-200 dark:border-white/15 disabled:opacity-35 cursor-pointer"
+                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {visibleReports.map((rep) => {
               const isResolved = rep.status === 'Resolved';
               return (
                 <article
                   key={rep.id}
-                  className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-4 flex flex-col justify-between gap-2.5"
+                  className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 flex flex-col justify-between gap-3"
                 >
                   <SmartImage
                     src={rep.photoUrl}
                     alt={rep.title}
                     categoryId={rep.categoryId}
                     label={`${rep.departmentLabel} · ${rep.suburb}`}
-                    className="h-28 w-full"
+                    className="h-28 w-full rounded-xl"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <SlaCountdown report={rep} />
@@ -420,9 +432,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                         );
                       }}
                       title="Share report to WhatsApp"
-                      className="min-h-[32px] px-2.5 border border-slate-200 dark:border-white/20 text-[11px] font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer"
+                      className="min-h-[32px] px-2.5 rounded-lg border border-slate-200/90 dark:border-white/15 text-[11px] font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                     >
-                      <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>Share</span>
                     </button>
                   </div>
@@ -433,8 +445,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     onSendSlaReminder={onSendSlaReminder}
                   />
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-sky-600 dark:text-sky-400 font-semibold">
+                    <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                         {rep.id} · {rep.municipalRef || 'PENDING REF'}
                       </span>
                       <span
@@ -447,7 +459,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                         {rep.status}
                       </span>
                     </div>
-                    <h2 className="font-display text-sm font-bold text-slate-900 dark:text-white">
+                    <h2 className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">
                       {rep.title}
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
@@ -455,15 +467,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     </p>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-[11px]">
-                    <span className="font-mono text-slate-400">
+                  <div className="pt-2.5 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-[11px]">
+                    <span className="font-mono text-slate-400 tabular-nums">
                       {rep.timeAgoLabel} · SLA {rep.slaElapsedHours}h/{rep.slaDeadlineHours}h
                     </span>
                     {!isResolved ? (
                       <button
                         type="button"
                         onClick={() => onVerifyResolution(rep.id)}
-                        className="px-2.5 py-1 bg-emerald-600 text-white font-semibold cursor-pointer flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer flex items-center gap-1 active:scale-[0.98] transition-[background-color,transform] duration-150"
                       >
                         <CheckCircle2 className="w-3 h-3" />
                         <span>Mark Resolved</span>
@@ -484,15 +496,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {/* TAB 2: EARNED POINTS, HISTORY & CASHED OUT POINTS */}
       {tab === 'points' && (
         <section className="space-y-3">
-          <div className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-3.5 flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-4 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono tabular-nums">
               <span>
                 Available: <strong className="text-slate-900 dark:text-white">{user.credits} CR</strong>
               </span>
               <span className="text-emerald-600 dark:text-emerald-400">
                 Earned: <strong>+{totalEarned} CR</strong>
               </span>
-              <span className="text-sky-600 dark:text-sky-400">
+              <span className="text-slate-600 dark:text-slate-300">
                 Cashed Out: <strong>-{totalCashedOut} CR</strong>
               </span>
             </div>
@@ -500,7 +512,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <button
               type="button"
               onClick={onOpenRewards}
-              className="min-h-[34px] px-3 bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[36px] px-3.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
             >
               <Gift className="w-3.5 h-3.5" />
               <span>Cash Out Points</span>
@@ -508,7 +520,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {(
                 [
                   { id: 'all', label: `All (${transactions.length})` },
@@ -523,10 +535,10 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     setTxFilter(f.id);
                     setTxPage(0);
                   }}
-                  className={`min-h-[32px] px-2.5 text-xs font-mono cursor-pointer ${
+                  className={`min-h-[34px] px-3 rounded-xl text-xs font-mono cursor-pointer transition-colors duration-150 ${
                     txFilter === f.id
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
-                      : 'border border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-300'
+                      : 'border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   {f.label}
@@ -535,14 +547,14 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[11px] text-slate-400">
+              <span className="font-mono text-[11px] text-slate-400 tabular-nums">
                 {safeTxPage + 1} / {txTotalPages}
               </span>
               <button
                 type="button"
                 disabled={safeTxPage === 0}
                 onClick={() => setTxPage((p) => Math.max(0, p - 1))}
-                className="min-h-[32px] min-w-[32px] flex items-center justify-center border border-slate-200 dark:border-white/15 disabled:opacity-35 cursor-pointer"
+                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -550,18 +562,18 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 type="button"
                 disabled={safeTxPage >= txTotalPages - 1}
                 onClick={() => setTxPage((p) => Math.min(txTotalPages - 1, p + 1))}
-                className="min-h-[32px] min-w-[32px] flex items-center justify-center border border-slate-200 dark:border-white/15 disabled:opacity-35 cursor-pointer"
+                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 divide-y divide-slate-100 dark:divide-white/10">
+          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] divide-y divide-slate-100 dark:divide-white/[0.06] overflow-hidden">
             {visibleTx.map((tx) => (
               <div key={tx.id} className="p-3.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                     {tx.title}
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
@@ -573,7 +585,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   className={`font-mono text-sm font-bold tabular-nums shrink-0 ${
                     tx.type === 'earn'
                       ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-sky-600 dark:text-sky-400'
+                      : 'text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   {tx.type === 'earn' ? `+${tx.points} CR` : `-${tx.points} CR`}
@@ -588,16 +600,16 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {tab === 'bills' && activeBill && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {(['total', 'water', 'electricity', 'rates', 'taxes'] as BillMetric[]).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setBillMetric(m)}
-                  className={`min-h-[32px] px-2.5 text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`min-h-[34px] px-3 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                     billMetric === m
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
-                      : 'border border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-300'
+                      : 'border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   {METRIC_LABELS[m]}
@@ -608,80 +620,80 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <button
               type="button"
               onClick={() => setEditingBill((v) => !v)}
-              className="min-h-[32px] px-2.5 border border-slate-200 dark:border-white/15 text-xs font-semibold text-sky-600 dark:text-sky-400 flex items-center gap-1 cursor-pointer shrink-0"
+              className="min-h-[34px] px-3 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-[0.98] transition-transform duration-150"
             >
               <Pencil className="w-3 h-3" />
-              <span>{editingBill ? 'Close Edit' : 'Update My Bill'}</span>
+              <span>{editingBill ? 'Close Edit' : 'Update Bill'}</span>
             </button>
           </div>
 
           {editingBill ? (
             <form
               onSubmit={handleSaveEditedBill}
-              className="bg-white dark:bg-[#0A0E17] border border-sky-500/40 p-3.5 space-y-2.5"
+              className="rounded-2xl bg-white dark:bg-[#111827] border border-emerald-600/30 p-4 sm:p-5 space-y-3"
             >
               <div className="text-xs font-bold text-slate-900 dark:text-white">
-                Update {latestBill?.monthLabel} 2026 Municipal Statement (ZAR)
+                Update {latestBill?.monthLabel} 2026 Statement (ZAR)
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div>
-                  <label className="block text-[10px] font-mono text-slate-400 mb-0.5">Water (R)</label>
+                  <label className="block text-[10px] font-mono text-slate-400 mb-1">Water (R)</label>
                   <input
                     type="number"
                     value={draftWater}
                     onChange={(e) => setDraftWater(e.target.value)}
-                    className="w-full min-h-[36px] px-2 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-[#05070B] text-xs font-mono"
+                    className={billInputClass}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono text-slate-400 mb-0.5">Electricity (R)</label>
+                  <label className="block text-[10px] font-mono text-slate-400 mb-1">Electricity (R)</label>
                   <input
                     type="number"
                     value={draftElec}
                     onChange={(e) => setDraftElec(e.target.value)}
-                    className="w-full min-h-[36px] px-2 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-[#05070B] text-xs font-mono"
+                    className={billInputClass}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono text-slate-400 mb-0.5">Rates (R)</label>
+                  <label className="block text-[10px] font-mono text-slate-400 mb-1">Rates (R)</label>
                   <input
                     type="number"
                     value={draftRates}
                     onChange={(e) => setDraftRates(e.target.value)}
-                    className="w-full min-h-[36px] px-2 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-[#05070B] text-xs font-mono"
+                    className={billInputClass}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono text-slate-400 mb-0.5">Mun. Taxes (R)</label>
+                  <label className="block text-[10px] font-mono text-slate-400 mb-1">Mun. Taxes (R)</label>
                   <input
                     type="number"
                     value={draftTaxes}
                     onChange={(e) => setDraftTaxes(e.target.value)}
-                    className="w-full min-h-[36px] px-2 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-[#05070B] text-xs font-mono"
+                    className={billInputClass}
                   />
                 </div>
               </div>
               <button
                 type="submit"
-                className="min-h-[36px] px-4 bg-sky-600 text-white text-xs font-bold cursor-pointer"
+                className="min-h-[38px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
               >
-                Save & Recalculate Trends
+                Save & Recalculate
               </button>
             </form>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
               {/* Left: 6-Month Bar Chart */}
-              <div className="lg:col-span-7 bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-3.5 space-y-2.5">
+              <div className="lg:col-span-7 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-4 space-y-2.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-slate-900 dark:text-white">
-                    6-Month {METRIC_LABELS[billMetric]} Trend (Tap bar)
+                    6-Month {METRIC_LABELS[billMetric]} Trend
                   </span>
                   <span
-                    className={`font-mono font-semibold flex items-center gap-1 ${
+                    className={`font-mono font-semibold flex items-center gap-1 tabular-nums ${
                       momDeltaPct > 0
                         ? 'text-red-500'
                         : momDeltaPct < 0
-                          ? 'text-emerald-500'
+                          ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-slate-400'
                     }`}
                   >
@@ -713,10 +725,10 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                         </span>
                         <div className="w-full flex-1 flex items-end">
                           <div
-                            className={`w-full transition-all ${
+                            className={`w-full rounded-t-lg transition-[background-color] duration-150 ${
                               isSel
-                                ? 'bg-sky-500 dark:bg-sky-400'
-                                : 'bg-slate-200 dark:bg-white/15 group-hover:bg-sky-500/60'
+                                ? 'bg-emerald-600 dark:bg-emerald-400'
+                                : 'bg-slate-200 dark:bg-white/10 group-hover:bg-emerald-600/50'
                             }`}
                             style={{ height: `${pct}%` }}
                           />
@@ -737,17 +749,17 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               </div>
 
               {/* Right: Selected Month Breakdown */}
-              <div className="lg:col-span-5 bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-3.5 flex flex-col justify-between gap-2">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-2">
-                  <span className="font-display text-sm font-bold text-slate-900 dark:text-white">
+              <div className="lg:col-span-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-4 flex flex-col justify-between gap-2.5">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/[0.06] pb-2">
+                  <span className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">
                     {activeBill.monthLabel} 2026 Breakdown
                   </span>
-                  <span className="font-mono text-sm font-bold text-sky-600 dark:text-sky-400 tabular-nums">
+                  <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                     R{getBillMetricValue(activeBill, 'total').toLocaleString()}
                   </span>
                 </div>
 
-                <div className="space-y-1.5 text-xs">
+                <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                       <Droplets className="w-3.5 h-3.5 text-sky-500" />
@@ -781,9 +793,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setTab('compare')}
-                  className="w-full min-h-[36px] bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold cursor-pointer"
+                  className="w-full h-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold cursor-pointer active:scale-[0.98] transition-transform duration-150"
                 >
-                  Compare vs Other Wards & Towns →
+                  Compare vs Other Wards →
                 </button>
               </div>
             </div>
@@ -795,16 +807,16 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {tab === 'compare' && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {(['total', 'water', 'electricity', 'rates', 'taxes'] as BillMetric[]).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setCompareMetric(m)}
-                  className={`min-h-[32px] px-2.5 text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`min-h-[34px] px-3 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                     compareMetric === m
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
-                      : 'border border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-300'
+                      : 'border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   {METRIC_LABELS[m]}
@@ -819,7 +831,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   setBenchmarkIdx((i) => (i - 1 + SEED_WARD_TOWN_BENCHMARKS.length) % SEED_WARD_TOWN_BENCHMARKS.length)
                 }
                 aria-label="Previous ward or town"
-                className="min-h-[32px] min-w-[32px] flex items-center justify-center border border-slate-200 dark:border-white/15 cursor-pointer"
+                className="min-h-[34px] min-w-[34px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] cursor-pointer active:scale-95 transition-transform duration-150"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -827,7 +839,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 aria-label="Compare against ward or town"
                 value={benchmarkIdx}
                 onChange={(e) => setBenchmarkIdx(Number(e.target.value))}
-                className="min-h-[32px] px-2 border border-slate-200 dark:border-white/15 bg-white dark:bg-[#0A0E17] text-xs font-semibold"
+                className="h-[34px] px-3 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-xs font-semibold"
               >
                 {SEED_WARD_TOWN_BENCHMARKS.map((b, idx) => (
                   <option key={b.id} value={idx}>
@@ -841,29 +853,29 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   setBenchmarkIdx((i) => (i + 1) % SEED_WARD_TOWN_BENCHMARKS.length)
                 }
                 aria-label="Next ward or town"
-                className="min-h-[32px] min-w-[32px] flex items-center justify-center border border-slate-200 dark:border-white/15 cursor-pointer"
+                className="min-h-[34px] min-w-[34px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] cursor-pointer active:scale-95 transition-transform duration-150"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-4 space-y-3">
+          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-4 sm:p-5 space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="font-mono text-[10px] text-sky-600 dark:text-sky-400">
+                <div className="font-mono text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                   {METRIC_LABELS[compareMetric].toUpperCase()} BENCHMARK ({latestBill?.monthLabel} 2026)
                 </div>
-                <h2 className="font-display text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                <h2 className="font-display text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">
                   You vs Ward {activeWard.wardNumber} Avg vs {compareBench.townOrMetro}
                 </h2>
               </div>
 
               <span
-                className={`font-mono text-xs font-bold px-2.5 py-1 border ${
+                className={`font-mono text-xs font-bold px-2.5 py-1 rounded-lg border tabular-nums ${
                   vsTargetDiff <= 0
-                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                    : 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    ? 'border-emerald-600/30 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400'
+                    : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
                 }`}
               >
                 {vsTargetDiff <= 0
@@ -872,13 +884,12 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               </span>
             </div>
 
-            {/* 3 Visual Horizontal Comparison Bars */}
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {[
                 {
                   label: `Your Household (Ward ${activeWard.wardNumber})`,
                   val: userLatestVal,
-                  barClass: 'bg-sky-500',
+                  barClass: 'bg-emerald-600 dark:bg-emerald-400',
                 },
                 {
                   label: `${homeAvgBench.label}`,
@@ -900,9 +911,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                       R{row.val.toLocaleString()}/mo
                     </strong>
                   </div>
-                  <div className="h-2.5 bg-slate-100 dark:bg-white/10 overflow-hidden">
+                  <div className="h-2.5 rounded-full bg-slate-100 dark:bg-white/[0.06] overflow-hidden">
                     <div
-                      className={`h-full transition-all duration-300 ${row.barClass}`}
+                      className={`h-full rounded-full transition-[width] duration-200 ease-out ${row.barClass}`}
                       style={{ width: `${Math.max(8, Math.round((row.val / maxCompareVal) * 100))}%` }}
                     />
                   </div>
@@ -910,21 +921,20 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               ))}
             </div>
 
-            {/* Tariff & Service Delivery Matrix */}
-            <div className="pt-2.5 border-t border-slate-100 dark:border-white/10 grid grid-cols-3 gap-2 text-center font-mono text-[11px]">
-              <div className="p-2 bg-slate-50 dark:bg-white/[0.03]">
+            <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] grid grid-cols-3 gap-2 text-center font-mono text-[11px] tabular-nums">
+              <div className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03]">
                 <div className="text-slate-400 text-[10px]">WATER TARIFF</div>
                 <div className="font-bold text-slate-900 dark:text-white">
                   R{compareBench.waterTariffPerKl.toFixed(1)}/kL
                 </div>
               </div>
-              <div className="p-2 bg-slate-50 dark:bg-white/[0.03]">
+              <div className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03]">
                 <div className="text-slate-400 text-[10px]">POWER TARIFF</div>
                 <div className="font-bold text-slate-900 dark:text-white">
                   R{compareBench.elecTariffPerKwh.toFixed(2)}/kWh
                 </div>
               </div>
-              <div className="p-2 bg-slate-50 dark:bg-white/[0.03]">
+              <div className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03]">
                 <div className="text-slate-400 text-[10px]">SLA SCORE</div>
                 <div className="font-bold text-emerald-600 dark:text-emerald-400">
                   {compareBench.slaResolutionScore}%
@@ -936,4 +946,6 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       )}
     </div>
   );
-};
+});
+
+UserProfileView.displayName = 'UserProfileView';

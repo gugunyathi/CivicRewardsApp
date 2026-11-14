@@ -57,7 +57,7 @@
 /* Leaflet integration tweaks for dark/light civic map theme */
 .leaflet-container {
   font-family: var(--font-sans);
-  background: #0a0e17;
+  background: #0b0f17;
   outline: none;
 }
 .leaflet-control-attribution {
@@ -65,20 +65,22 @@
   opacity: 0.65;
 }
 .leaflet-control-attribution a {
-  color: #0284c7 !important;
+  color: #059669 !important;
 }
 .leaflet-control-scale-line {
   font-size: 9px;
   font-family: var(--font-mono);
-  background: rgba(2, 6, 23, 0.55);
+  background: rgba(11, 15, 23, 0.7);
   color: #e2e8f0;
-  border-color: rgba(226, 232, 240, 0.5);
+  border-color: rgba(226, 232, 240, 0.4);
+  border-radius: 6px;
 }
 .leaflet-tooltip {
   font-family: var(--font-mono);
   font-size: 11px;
-  border-radius: 0;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
 }
 
 /* Civic fault pins: transparent wrapper so only the SVG dot shows */
@@ -87,52 +89,76 @@
   border: none;
 }
 .civic-map-pin-pulse > div {
-  animation: civic-pin-pulse 1.8s ease-out infinite;
+  animation: civic-pin-pulse 2s ease-out infinite;
 }
 @keyframes civic-pin-pulse {
-  0% { filter: drop-shadow(0 0 0 rgba(234, 88, 12, 0.7)); }
-  50% { filter: drop-shadow(0 0 7px rgba(234, 88, 12, 0.9)); }
-  100% { filter: drop-shadow(0 0 0 rgba(234, 88, 12, 0.7)); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .civic-map-pin-pulse > div {
-    animation: none;
-  }
+  0% { filter: drop-shadow(0 0 0 rgba(234, 88, 12, 0.55)); }
+  50% { filter: drop-shadow(0 0 6px rgba(234, 88, 12, 0.75)); }
+  100% { filter: drop-shadow(0 0 0 rgba(234, 88, 12, 0.55)); }
 }
 
 @keyframes wizardStepForward {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes wizardStepBack {
-  from {
-    opacity: 0;
-    transform: translateX(-18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes modalEnter {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes drawerLeftEnter {
+  from { opacity: 0.4; transform: translateX(-100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes drawerRightEnter {
+  from { opacity: 0.4; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .wizard-step-forward {
-  animation: wizardStepForward 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: wizardStepForward 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .wizard-step-back {
-  animation: wizardStepBack 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: wizardStepBack 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ui-modal-enter {
+  animation: modalEnter 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ui-drawer-left {
+  animation: drawerLeftEnter 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ui-drawer-right {
+  animation: drawerRightEnter 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ui-backdrop-enter {
+  animation: fadeIn 160ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .civic-map-pin-pulse > div,
   .wizard-step-forward,
-  .wizard-step-back {
+  .wizard-step-back,
+  .ui-modal-enter,
+  .ui-drawer-left,
+  .ui-drawer-right,
+  .ui-backdrop-enter {
     animation: none;
   }
 }

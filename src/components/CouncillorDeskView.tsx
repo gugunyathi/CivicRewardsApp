@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
   BellRing,
@@ -38,7 +38,7 @@ const WORKFLOW_STEPS: ReportStatus[] = [
 const isDarkTheme = () =>
   typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
-export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
+export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(({
   reports,
   activeWard,
   onUpdateStatus,
@@ -51,32 +51,41 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
   const [refDrafts, setRefDrafts] = useState<Record<string, string>>({});
   const [ticketIdx, setTicketIdx] = useState(0);
 
-  const filtered = reports.filter((r) => {
-    const matchesWard = wardFilter === 'ALL' || r.wardId === wardFilter;
-    const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
-    return matchesWard && matchesStatus;
-  });
+  const filtered = useMemo(
+    () =>
+      reports.filter((r) => {
+        const matchesWard = wardFilter === 'ALL' || r.wardId === wardFilter;
+        const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
+        return matchesWard && matchesStatus;
+      }),
+    [reports, wardFilter, statusFilter]
+  );
 
   const safeIdx = Math.min(ticketIdx, Math.max(0, filtered.length - 1));
   const currentTicket = filtered[safeIdx];
 
-  const breachedCount = reports.filter(
-    (r) =>
-      r.status !== 'Resolved' &&
-      r.status !== 'Blocked by AI Forensics' &&
-      r.slaElapsedHours > r.slaDeadlineHours
-  ).length;
-  const blockedCount = reports.filter((r) => r.status === 'Blocked by AI Forensics').length;
+  const { breachedCount, blockedCount } = useMemo(
+    () => ({
+      breachedCount: reports.filter(
+        (r) =>
+          r.status !== 'Resolved' &&
+          r.status !== 'Blocked by AI Forensics' &&
+          r.slaElapsedHours > r.slaDeadlineHours
+      ).length,
+      blockedCount: reports.filter((r) => r.status === 'Blocked by AI Forensics').length,
+    }),
+    [reports]
+  );
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
-          <h1 className="font-display text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-            Councillor & Depot Escalation Desk
+          <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Councillor Escalation Desk
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Queue {reports.length} · SLA Breached {breachedCount} · AI Quarantined {blockedCount}
+          <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+            {reports.length} queued · {breachedCount} SLA breached · {blockedCount} quarantined
           </p>
         </div>
 
@@ -89,7 +98,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
             disabled={safeIdx === 0 || filtered.length === 0}
             onClick={() => setTicketIdx((i) => Math.max(0, i - 1))}
             aria-label="Previous ticket"
-            className="min-h-[36px] min-w-[36px] flex items-center justify-center border border-slate-200 dark:border-white/15 disabled:opacity-35 cursor-pointer"
+            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -98,7 +107,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
             disabled={safeIdx >= filtered.length - 1 || filtered.length === 0}
             onClick={() => setTicketIdx((i) => Math.min(filtered.length - 1, i + 1))}
             aria-label="Next ticket"
-            className="min-h-[36px] min-w-[36px] flex items-center justify-center border border-slate-200 dark:border-white/15 disabled:opacity-35 cursor-pointer"
+            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -106,7 +115,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-2.5">
+      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-2.5">
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {['ALL', ...WORKFLOW_STEPS, 'Blocked by AI Forensics'].map((st) => (
             <button
@@ -116,7 +125,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                 setStatusFilter(st);
                 setTicketIdx(0);
               }}
-              className={`min-h-[32px] px-2.5 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+              className={`min-h-[34px] px-3 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                 statusFilter === st
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -134,7 +143,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
             setTicketIdx(0);
           }}
           aria-label="Filter by Ward"
-          className="min-h-[36px] px-2.5 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-[#05070B] text-xs text-slate-900 dark:text-white"
+          className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600"
         >
           <option value="ALL">All Wards</option>
           <option value={activeWard.id}>
@@ -148,10 +157,10 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
         </select>
       </div>
 
-      {/* Single-Ticket Focus Card (Zero Vertical Scroll) */}
+      {/* Single-Ticket Focus Card */}
       {!currentTicket ? (
-        <div className="p-8 bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 text-center text-sm text-slate-500">
-          No tickets match the selected ward and status filter.
+        <div className="p-8 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] text-center text-sm text-slate-500">
+          No tickets match this filter.
         </div>
       ) : (
         (() => {
@@ -164,11 +173,11 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
           const wardMeta = SEED_WARDS.find((w) => w.id === report.wardId);
 
           return (
-            <div className="bg-white dark:bg-[#0A0E17] border border-slate-200 dark:border-white/15 p-4 space-y-3.5">
+            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 sm:p-5 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
                 <div className="space-y-1 flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                    <span className="font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
                       {report.id}
                     </span>
                     <span aria-hidden="true">·</span>
@@ -178,12 +187,12 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                     <span aria-hidden="true">·</span>
                     <span>{wardMeta?.councillor.name ?? 'Councillor'}</span>
                     <span aria-hidden="true">·</span>
-                    <span className="font-medium text-sky-600 dark:text-sky-400">
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
                       {report.assignedDepot}
                     </span>
                   </div>
 
-                  <h3 className="font-display text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  <h3 className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                     {report.title}
                   </h3>
 
@@ -216,9 +225,9 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
               </div>
 
               {/* Evidence photo + fault location map */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <div className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <div className="font-mono text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                     Evidence capture
                   </div>
                   <SmartImage
@@ -226,11 +235,11 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                     alt={report.title}
                     categoryId={report.categoryId}
                     label={`${report.departmentLabel} · ${report.suburb}`}
-                    className="h-32 w-full border border-slate-200 dark:border-white/15"
+                    className="h-32 w-full rounded-xl border border-slate-200/80 dark:border-white/[0.08]"
                   />
                 </div>
-                <div className="space-y-1">
-                  <div className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">
+                <div className="space-y-1.5">
+                  <div className="font-mono text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                     Fault location
                   </div>
                   <MiniMapPreview
@@ -239,12 +248,11 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                     zoom={14}
                     darkMode={isDarkTheme()}
                     label={`${report.address} · ${report.lat.toFixed(3)}, ${report.lng.toFixed(3)}`}
-                    className="h-32 w-full border border-slate-200 dark:border-white/15"
+                    className="h-32 w-full rounded-xl border border-slate-200/80 dark:border-white/[0.08]"
                   />
                 </div>
               </div>
 
-              {/* Guided escalation path */}
               <EscalationPanel
                 report={report}
                 ward={wardMeta ?? activeWard}
@@ -254,7 +262,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
 
               {/* Progress Stepper */}
               {report.status !== 'Blocked by AI Forensics' && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {WORKFLOW_STEPS.map((step, idx) => {
                     const active = step === report.status;
                     const done = currentStepIdx >= idx;
@@ -263,12 +271,12 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                         key={step}
                         type="button"
                         onClick={() => onUpdateStatus(report.id, step)}
-                        className={`min-h-[38px] px-2.5 py-1 border text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer ${
+                        className={`min-h-[40px] px-3 py-1 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,border-color,transform] duration-150 ${
                           active
-                            ? 'bg-sky-600 border-sky-600 text-white'
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
                             : done
-                              ? 'bg-sky-500/10 border-sky-500/40 text-sky-700 dark:text-sky-300'
-                              : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-400 hover:border-sky-500'
+                              ? 'bg-emerald-600/10 border-emerald-600/30 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-slate-50/70 dark:bg-white/[0.04] border-slate-200/80 dark:border-white/[0.08] text-slate-600 dark:text-slate-400 hover:border-emerald-600/60'
                         }`}
                       >
                         {step === 'Technician Dispatched' && <Wrench className="w-3 h-3 shrink-0" />}
@@ -280,8 +288,8 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                 </div>
               )}
 
-              {/* Controls: Attach Official Ref, Verify Stripped Media, Trigger SLA Reminder */}
-              <div className="pt-2.5 border-t border-slate-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              {/* Controls */}
+              <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <input
                     type="text"
@@ -290,7 +298,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                       setRefDrafts((prev) => ({ ...prev, [report.id]: e.target.value }))
                     }
                     placeholder="Ref # (e.g. CPWEB5012)"
-                    className="min-h-[36px] px-2.5 border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-[#05070B] text-xs font-mono text-slate-900 dark:text-white"
+                    className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-xs font-mono text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600"
                   />
                   <button
                     type="button"
@@ -298,7 +306,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                       const val = (refDrafts[report.id] ?? report.municipalRef ?? '').trim();
                       if (val) onAttachRef(report.id, val);
                     }}
-                    className="min-h-[36px] px-3 bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold cursor-pointer"
+                    className="h-9 px-3.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold cursor-pointer active:scale-[0.98] transition-transform duration-150"
                   >
                     Save Ref #
                   </button>
@@ -307,7 +315,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onApproveStrippedMedia(report.id)}
-                      className="min-h-[36px] px-2.5 border border-emerald-600 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      className="h-9 px-3 rounded-xl border border-emerald-600/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                     >
                       <FileCheck2 className="w-3.5 h-3.5" />
                       <span>Verify</span>
@@ -315,47 +323,48 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const w = wardMeta ?? activeWard;
-                    openWhatsAppShare(
-                      report,
-                      {
-                        wardLabel: `${report.municipalityCode} W${report.wardNumber} (${report.suburb})`,
-                        councillorName: w.councillor.name,
-                      },
-                      w.councillor.whatsappEscalation
-                    );
-                  }}
-                  title="Share report to WhatsApp"
-                  className="min-h-[36px] px-3 border border-slate-200 dark:border-white/20 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>WhatsApp</span>
-                </button>
-
-                {report.status !== 'Blocked by AI Forensics' && report.status !== 'Resolved' && (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => onSendSlaReminder(report.id)}
-                    className={`min-h-[36px] px-3 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
-                      slaBreached
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'border border-slate-200 dark:border-white/20 text-slate-700 dark:text-slate-200'
-                    }`}
+                    onClick={() => {
+                      const w = wardMeta ?? activeWard;
+                      openWhatsAppShare(
+                        report,
+                        {
+                          wardLabel: `${report.municipalityCode} W${report.wardNumber} (${report.suburb})`,
+                          councillorName: w.councillor.name,
+                        },
+                        w.councillor.whatsappEscalation
+                      );
+                    }}
+                    title="Share report to WhatsApp"
+                    className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                   >
-                    <BellRing className="w-3.5 h-3.5" />
-                    <span>{slaBreached ? 'Escalate SLA Breach' : 'Depot Follow-Up'}</span>
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>WhatsApp</span>
                   </button>
-                )}
+
+                  {report.status !== 'Blocked by AI Forensics' && report.status !== 'Resolved' && (
+                    <button
+                      type="button"
+                      onClick={() => onSendSlaReminder(report.id)}
+                      className={`h-9 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150 ${
+                        slaBreached
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'border border-slate-200/90 dark:border-white/12 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <BellRing className="w-3.5 h-3.5" />
+                      <span>{slaBreached ? 'Escalate SLA Breach' : 'Depot Follow-Up'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Recent Audit Entries */}
               <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5 font-mono">
                 {report.escalationLog.slice(-2).map((entry, i) => (
                   <div key={i} className="truncate">
-                    • {entry}
+                    · {entry}
                   </div>
                 ))}
               </div>
@@ -365,4 +374,6 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = ({
       )}
     </div>
   );
-};
+});
+
+CouncillorDeskView.displayName = 'CouncillorDeskView';

@@ -9,17 +9,13 @@ interface InteractiveMapProps {
   centerLng: number;
   zoom?: number;
   darkMode: boolean;
-  /** Free keyless basemap. Defaults from darkMode (dark/streets). */
   basemap?: BasemapId;
   mode: 'picker' | 'explorer';
   className?: string;
-  /** When false, disables pan/zoom interaction (preview mode). */
   interactive?: boolean;
-  // Picker mode props
   pickedLat?: number;
   pickedLng?: number;
   onPickLocation?: (lat: number, lng: number) => void;
-  // Explorer mode props
   reports?: CivicReport[];
   wards?: WardRecord[];
   selectedReportId?: string | null;
@@ -31,7 +27,7 @@ function statusColor(report: CivicReport): string {
   if (report.forensics.status === 'FLAGGED_SYNTHETIC') return '#dc2626';
   if (report.status === 'Resolved') return '#059669';
   if (report.isEmergency || report.severity === 'CRITICAL') return '#ea580c';
-  return '#0284c7';
+  return '#0f172a';
 }
 
 function createPinIcon(color: string, label: string, selected = false, pulse = false) {
@@ -53,7 +49,7 @@ function createPinIcon(color: string, label: string, selected = false, pulse = f
   });
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({
+export const InteractiveMap: React.FC<InteractiveMapProps> = React.memo(({
   centerLat,
   centerLng,
   zoom = 13,
@@ -76,10 +72,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
   const pickerMarkerRef = useRef<L.Marker | null>(null);
+  const prevFocusRef = useRef<{ lat: number; lng: number; zoom: number }>({
+    lat: centerLat,
+    lng: centerLng,
+    zoom,
+  });
   const callbacksRef = useRef({ onPickLocation, onSelectReport, onSelectWard });
   callbacksRef.current = { onPickLocation, onSelectReport, onSelectWard };
 
-  // Initialize Leaflet map instance
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -105,9 +105,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     mapRef.current = map;
     layerGroupRef.current = group;
 
-    // Fix sizing when mounted inside modals / animated containers
-    const t1 = window.setTimeout(() => map.invalidateSize(), 120);
-    const t2 = window.setTimeout(() => map.invalidateSize(), 600);
+    const t1 = window.setTimeout(() => map.invalidateSize(), 100);
+    const t2 = window.setTimeout(() => map.invalidateSize(), 420);
 
     return () => {
       window.clearTimeout(t1);
@@ -121,7 +120,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update free basemap tiles when basemap / darkMode changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -141,14 +139,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     tileLayerRef.current = layer;
   }, [basemap, darkMode]);
 
-  // Smoothly fly when centerLat / centerLng / zoom prop changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.flyTo([centerLat, centerLng], zoom, { duration: 0.7 });
+    const prev = prevFocusRef.current;
+    if (prev.lat === centerLat && prev.lng === centerLng && prev.zoom === zoom) return;
+    prevFocusRef.current = { lat: centerLat, lng: centerLng, zoom };
+    map.flyTo([centerLat, centerLng], zoom, { duration: 0.55 });
   }, [centerLat, centerLng, zoom]);
 
-  // Picker mode: draggable + clickable pin
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mode !== 'picker') return;
@@ -159,7 +158,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     if (!pickerMarkerRef.current) {
       const marker = L.marker([lat, lng], {
         draggable: interactive,
-        icon: createPinIcon('#0284c7', '+', true),
+        icon: createPinIcon('#059669', '+', true),
       }).addTo(map);
 
       marker.on('dragend', () => {
@@ -186,7 +185,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, [mode, pickedLat, pickedLng, centerLat, centerLng, interactive]);
 
-  // Explorer mode: render Ward circles + Fault pins
   useEffect(() => {
     const group = layerGroupRef.current;
     if (!group || mode !== 'explorer') return;
@@ -195,14 +193,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     wards.forEach((ward) => {
       const circle = L.circle([ward.lat, ward.lng], {
         radius: 1400,
-        color: '#38bdf8',
+        color: '#10b981',
         weight: 1.5,
         opacity: 0.55,
-        fillColor: '#0284c7',
-        fillOpacity: 0.07,
+        fillColor: '#059669',
+        fillOpacity: 0.06,
       });
       circle.on('click', () => callbacksRef.current.onSelectWard?.(ward));
-      circle.bindTooltip(`Ward ${ward.wardNumber} · ${ward.suburbs[0]} — tap to activate`, {
+      circle.bindTooltip(`Ward ${ward.wardNumber} · ${ward.suburbs[0]}`, {
         direction: 'top',
       });
       circle.addTo(group);
@@ -225,4 +223,4 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   }, [mode, reports, wards, selectedReportId]);
 
   return <div ref={containerRef} className={`${className} z-0`} />;
-};
+});
