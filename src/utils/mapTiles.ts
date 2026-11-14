@@ -1,6 +1,7 @@
 /**
  * Basemap definitions powered by Mapbox Styles API (proxied server-side via /api/mapbox/tiles/*
- * so MAPBOX_TOKEN remains strictly on the server, with automatic OSM/CARTO fallback if unavailable).
+ * so MAPBOX_TOKEN remains strictly on the server, with automatic OSM/CARTO fallback if unavailable,
+ * or direct high-performance Mapbox CDN if VITE_MAPBOX_TOKEN is provided).
  */
 export type BasemapId = 'streets' | 'light' | 'dark' | 'satellite';
 
@@ -17,12 +18,35 @@ export interface BasemapDef {
 const MAPBOX_ATTRIBUTION =
   '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
+export const MAPBOX_STYLE_IDS: Record<BasemapId, string> = {
+  streets: 'mapbox/streets-v12',
+  light: 'mapbox/light-v11',
+  dark: 'mapbox/dark-v11',
+  satellite: 'mapbox/satellite-streets-v12',
+};
+
+export function getMapboxToken(): string {
+  try {
+    return (import.meta.env.VITE_MAPBOX_TOKEN || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+export function getTileUrl(style: BasemapId): string {
+  const token = getMapboxToken();
+  if (token) {
+    return `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE_IDS[style]}/tiles/256/{z}/{x}/{y}@2x?access_token=${encodeURIComponent(token)}`;
+  }
+  return `/api/mapbox/tiles/${style}/{z}/{x}/{y}`;
+}
+
 export const BASEMAPS: Record<BasemapId, BasemapDef> = {
   streets: {
     id: 'streets',
     label: 'Mapbox Streets',
     shortLabel: 'Streets',
-    tileUrl: '/api/mapbox/tiles/streets/{z}/{x}/{y}',
+    tileUrl: getTileUrl('streets'),
     attribution: MAPBOX_ATTRIBUTION,
     subdomains: '',
     maxZoom: 20,
@@ -31,7 +55,7 @@ export const BASEMAPS: Record<BasemapId, BasemapDef> = {
     id: 'light',
     label: 'Mapbox Light',
     shortLabel: 'Light',
-    tileUrl: '/api/mapbox/tiles/light/{z}/{x}/{y}',
+    tileUrl: getTileUrl('light'),
     attribution: MAPBOX_ATTRIBUTION,
     subdomains: '',
     maxZoom: 20,
@@ -40,7 +64,7 @@ export const BASEMAPS: Record<BasemapId, BasemapDef> = {
     id: 'dark',
     label: 'Mapbox Dark',
     shortLabel: 'Dark',
-    tileUrl: '/api/mapbox/tiles/dark/{z}/{x}/{y}',
+    tileUrl: getTileUrl('dark'),
     attribution: MAPBOX_ATTRIBUTION,
     subdomains: '',
     maxZoom: 20,
@@ -49,7 +73,7 @@ export const BASEMAPS: Record<BasemapId, BasemapDef> = {
     id: 'satellite',
     label: 'Mapbox Satellite',
     shortLabel: 'Satellite',
-    tileUrl: '/api/mapbox/tiles/satellite/{z}/{x}/{y}',
+    tileUrl: getTileUrl('satellite'),
     attribution: MAPBOX_ATTRIBUTION,
     subdomains: '',
     maxZoom: 20,
@@ -78,9 +102,14 @@ export function latLngToTile(lat: number, lng: number, zoom: number): { x: numbe
   return { x, y };
 }
 
-/** Static single-tile thumbnail URL via our Mapbox tile proxy for ward/incident previews. */
+/** Static single-tile thumbnail URL via our Mapbox tile proxy or direct Mapbox CDN for ward/incident previews. */
 export function staticTileUrl(lat: number, lng: number, zoom: number, darkMode: boolean): string {
   const { x, y } = latLngToTile(lat, lng, zoom);
   const style = darkMode ? 'dark' : 'streets';
+  const token = getMapboxToken();
+  if (token) {
+    const styleId = darkMode ? 'mapbox/dark-v11' : 'mapbox/streets-v12';
+    return `https://api.mapbox.com/styles/v1/${styleId}/tiles/256/${zoom}/${x}/${y}@2x?access_token=${encodeURIComponent(token)}`;
+  }
   return `/api/mapbox/tiles/${style}/${zoom}/${x}/${y}`;
 }
