@@ -7,7 +7,9 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  GalleryHorizontalEnd,
   Layers,
+  LayoutGrid,
   Lock,
   Map as MapIcon,
   MapPin,
@@ -22,6 +24,7 @@ import type {
   WardRecord,
 } from '../types/civic';
 import { ServiceCarousel } from './ServiceCarousel';
+import { ServiceTilesGrid } from './ServiceTilesGrid';
 
 interface CommandCenterViewProps {
   activeWard: WardRecord;
@@ -33,6 +36,8 @@ interface CommandCenterViewProps {
   onOpenAuthModal: () => void;
   onOpenFeed: () => void;
   onOpenMap: () => void;
+  servicesLayout: 'carousel' | 'tiles';
+  onChangeServicesLayout: (layout: 'carousel' | 'tiles') => void;
 }
 
 const INCOME_BRACKETS = [
@@ -66,6 +71,8 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
   onOpenAuthModal,
   onOpenFeed,
   onOpenMap,
+  servicesLayout,
+  onChangeServicesLayout,
 }) => {
   const [activeCategoryIdx, setActiveCategoryIdx] = useState(0);
   const [infoDrawer, setInfoDrawer] = useState<'accounts' | 'anticorruption' | 'notices' | null>(null);
@@ -113,7 +120,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
   const currentNotice = PUBLIC_NOTICES_DATA[noticeIdx] ?? PUBLIC_NOTICES_DATA[0];
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 flex flex-col gap-3 sm:gap-4">
       {/* Emergency SOS Banner */}
       {emergencyMode && (
         <section
@@ -162,11 +169,11 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
             <span>{user.awayFromHome ? 'AWAY GPS' : 'HOME'}</span>
           </div>
           <h1 className="font-display text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Smart Civic Services
+            Municipal Services
           </h1>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={onOpenAuthModal}
@@ -194,17 +201,64 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
             <MapIcon className="w-3.5 h-3.5 text-sky-500" />
             <span>Map</span>
           </button>
+
+          <div
+            role="group"
+            aria-label="Service cards layout"
+            className="flex items-center border border-slate-200 dark:border-white/15 bg-slate-100 dark:bg-white/5 p-0.5"
+          >
+            <button
+              type="button"
+              onClick={() => onChangeServicesLayout('carousel')}
+              aria-pressed={servicesLayout === 'carousel'}
+              aria-label="Default carousel layout"
+              title="Default layout"
+              className={`min-h-[32px] px-2 text-[11px] sm:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                servicesLayout === 'carousel'
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <GalleryHorizontalEnd className="w-3.5 h-3.5 shrink-0" />
+              <span>Default</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeServicesLayout('tiles')}
+              aria-pressed={servicesLayout === 'tiles'}
+              aria-label="Tiles grid layout"
+              title="Tiles layout"
+              className={`min-h-[32px] px-2 text-[11px] sm:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                servicesLayout === 'tiles'
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+              <span>Tiles</span>
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* Viewport-Contained Editorial Carousel */}
-      <ServiceCarousel
-        categories={SERVICE_CATEGORIES}
-        activeIndex={activeCategoryIdx}
-        onSelectIndex={setActiveCategoryIdx}
-        onTriggerCategory={handleCategoryTrigger}
-        activeWard={activeWard}
-      />
+      {/* Viewport-Contained Editorial Carousel or Tiles Layout */}
+      {servicesLayout === 'tiles' ? (
+        <ServiceTilesGrid
+          categories={SERVICE_CATEGORIES}
+          activeIndex={activeCategoryIdx}
+          onSelectIndex={setActiveCategoryIdx}
+          onTriggerCategory={handleCategoryTrigger}
+          activeWard={activeWard}
+        />
+      ) : (
+        <ServiceCarousel
+          categories={SERVICE_CATEGORIES}
+          activeIndex={activeCategoryIdx}
+          onSelectIndex={setActiveCategoryIdx}
+          onTriggerCategory={handleCategoryTrigger}
+          activeWard={activeWard}
+        />
+      )}
 
       {/* Survey-Style Guided Modal Drawers for Categories 8, 9, 10 */}
       {infoDrawer && (

@@ -136,6 +136,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       r.reporterName === user.name ||
       r.reporterName === 'You (Ward Resident)' ||
       r.reporterName === 'Gugu Ndlovu' ||
+      r.timeAgoLabel === 'Just now' ||
       r.id === 'CP-2026-1041'
   );
   const resolvedCount = myReports.filter((r) => r.status === 'Resolved').length;

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AuthOnboardingModal } from './components/AuthOnboardingModal';
 import { BurgerMenuDrawer } from './components/BurgerMenuDrawer';
 import { CivicAssistantDrawer } from './components/CivicAssistantDrawer';
@@ -48,6 +47,23 @@ export default function App() {
   const [activeView, setActiveView] = useState<AppView>('hub');
   const [darkMode, setDarkMode] = useState(true);
   const [emergencyMode, setEmergencyMode] = useState(false);
+  const [servicesLayout, setServicesLayout] = useState<'carousel' | 'tiles'>(() => {
+    try {
+      const saved = localStorage.getItem('civicpulse_services_layout');
+      return saved === 'tiles' ? 'tiles' : 'carousel';
+    } catch {
+      return 'carousel';
+    }
+  });
+
+  const handleChangeServicesLayout = (next: 'carousel' | 'tiles') => {
+    setServicesLayout(next);
+    try {
+      localStorage.setItem('civicpulse_services_layout', next);
+    } catch {
+      // ignore storage restrictions
+    }
+  };
 
   const [user, setUser] = useState<UserProfile>({
     name: 'Guest Resident',
@@ -375,9 +391,9 @@ export default function App() {
             else goToPrevPage();
           }
         }}
-        className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 pt-3 pb-24 lg:pb-8 flex flex-col justify-between gap-4"
+        className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 pt-3 pb-20 lg:pb-6 flex flex-col gap-3"
       >
-        <div>
+        <div className="flex-1 flex flex-col">
           {activeView === 'hub' && (
             <CommandCenterView
               activeWard={activeWard}
@@ -392,6 +408,8 @@ export default function App() {
               onOpenAuthModal={() => setAuthModalOpen(true)}
               onOpenFeed={() => setActiveView('feed')}
               onOpenMap={() => setActiveView('map')}
+              servicesLayout={servicesLayout}
+              onChangeServicesLayout={handleChangeServicesLayout}
             />
           )}
 
@@ -487,31 +505,6 @@ export default function App() {
               onSendSlaReminder={handleSendSlaReminder}
             />
           )}
-        </div>
-
-        {/* Clean Arrow Page Stepper for Left/Right Navigation */}
-        <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-between gap-2 text-xs">
-          <button
-            type="button"
-            onClick={goToPrevPage}
-            className="min-h-[34px] px-2.5 border border-slate-200 dark:border-white/15 hover:border-slate-900 dark:hover:border-white text-slate-600 dark:text-slate-300 flex items-center gap-1 cursor-pointer"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            <span>{PAGE_ORDER[(currentPageIdx - 1 + PAGE_ORDER.length) % PAGE_ORDER.length].label}</span>
-          </button>
-
-          <span className="font-mono text-[11px] text-slate-400 tabular-nums">
-            {currentPageIdx + 1} / {PAGE_ORDER.length} · {PAGE_ORDER[currentPageIdx].label}
-          </span>
-
-          <button
-            type="button"
-            onClick={goToNextPage}
-            className="min-h-[34px] px-2.5 border border-slate-200 dark:border-white/15 hover:border-slate-900 dark:hover:border-white text-slate-600 dark:text-slate-300 flex items-center gap-1 cursor-pointer"
-          >
-            <span>{PAGE_ORDER[(currentPageIdx + 1) % PAGE_ORDER.length].label}</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       </main>
 

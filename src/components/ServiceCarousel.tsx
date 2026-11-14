@@ -18,7 +18,7 @@ import {
 import type { ServiceCategory, ServiceCategoryId, WardRecord } from '../types/civic';
 import { SmartImage } from './SmartImage';
 
-const SERVICE_INDICATOR_META: Record<
+export const SERVICE_INDICATOR_META: Record<
   ServiceCategoryId,
   { icon: React.ComponentType<{ className?: string }>; colorClass: string }
 > = {
@@ -94,14 +94,14 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
           else handlePrev();
         }
       }}
-      className="relative border border-slate-200 dark:border-white/12 bg-white dark:bg-[#060911] overflow-hidden"
+      className="relative flex-1 flex flex-col justify-between border border-slate-200 dark:border-white/12 bg-white dark:bg-[#060911] overflow-hidden"
     >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_50%_0%,rgba(56,189,248,0.12),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,rgba(56,189,248,0.16),transparent_70%)]"
       />
 
-      <div className="relative p-2.5 sm:p-4 space-y-2.5">
+      <div className="relative flex-1 flex flex-col justify-between p-2.5 sm:p-4 gap-3">
         {/* Carousel Track + Floating Edge Arrow Indicators */}
         <div className="relative">
           <button
@@ -150,8 +150,8 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
                   aria-current={isActive ? 'true' : undefined}
                   className={`group relative shrink-0 snap-center text-left overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-400 ${
                     isActive
-                      ? 'w-[74vw] sm:w-[460px] lg:w-[540px] h-[270px] sm:h-[360px] lg:h-[400px] border border-sky-500/85 dark:border-sky-400/85'
-                      : 'w-[19vw] sm:w-[84px] lg:w-[106px] hover:sm:w-[126px] h-[270px] sm:h-[360px] lg:h-[400px] border border-slate-200 dark:border-white/15 opacity-80 hover:opacity-100'
+                      ? 'w-[76vw] sm:w-[480px] lg:w-[580px] h-[clamp(350px,54dvh,520px)] sm:h-[clamp(440px,60dvh,600px)] lg:h-[clamp(480px,62dvh,640px)] border border-sky-500/85 dark:border-sky-400/85'
+                      : 'w-[18vw] sm:w-[88px] lg:w-[112px] hover:sm:w-[132px] h-[clamp(350px,54dvh,520px)] sm:h-[clamp(440px,60dvh,600px)] lg:h-[clamp(480px,62dvh,640px)] border border-slate-200 dark:border-white/15 opacity-80 hover:opacity-100'
                   }`}
                 >
                   <SmartImage
@@ -236,53 +236,61 @@ export const ServiceCarousel: React.FC<ServiceCarouselProps> = ({
                 title={cat.title}
                 aria-label={`Select ${cat.title}`}
                 aria-selected={active}
-                className={`h-8 sm:h-9 w-full flex items-center justify-center border transition-all cursor-pointer ${
+                className={`h-9 sm:h-10 w-full flex items-center justify-center border transition-all cursor-pointer ${
                   active
                     ? 'border-sky-500 bg-sky-500/15 dark:border-sky-400 dark:bg-sky-400/20'
                     : 'border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 hover:border-slate-400 dark:hover:border-white/40 opacity-80 hover:opacity-100'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${meta.colorClass}`} />
+                <Icon className={`w-4 h-4 sm:w-[18px] sm:h-[18px] ${meta.colorClass}`} />
               </button>
             );
           })}
         </div>
 
-        {/* Compact Editorial Footer Bar */}
-        <div className="pt-2.5 border-t border-slate-200 dark:border-white/15 flex items-center justify-between gap-2.5">
-          <div className="space-y-0.5 min-w-0 flex-1">
-            <h2 className="font-display text-sm sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate flex items-center gap-2">
-              <span className="w-7 h-7 shrink-0 hidden sm:flex items-center justify-center border border-sky-500/40 bg-sky-500/10">
-                <ActiveIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+        {/* Expanded Card Name & Service Details Footer */}
+        <div className="pt-3 pb-1 border-t border-slate-200 dark:border-white/15 flex items-center justify-between gap-3">
+          <div className="space-y-1 min-w-0 flex-1">
+            <h2 className="font-display text-base sm:text-xl lg:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+              <span className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center border border-sky-500/40 bg-sky-500/10">
+                <ActiveIcon className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600 dark:text-sky-400" />
               </span>
               <span className="truncate">{activeCategory.title}</span>
             </h2>
-            <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 truncate">
-              Ward {activeWard.wardNumber} ({activeWard.suburbs[0]}) · {activeCategory.description}
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">
+              {activeCategory.description}
             </p>
+            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+              <span>Ward {activeWard.wardNumber} ({activeWard.suburbs[0]})</span>
+              <span aria-hidden="true">·</span>
+              <span>{activeCategory.entity}</span>
+              <span aria-hidden="true">·</span>
+              <span className="text-sky-700 dark:text-sky-400 font-semibold">
+                {activeCategory.slaHours > 0 ? `${activeCategory.slaHours}h SLA` : 'Direct Portal'}
+              </span>
+              {!activeCategory.isInfoModule && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+50 CR</span>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="hidden sm:block text-right font-mono text-[11px] text-slate-600 dark:text-slate-300 tabular-nums">
-              <div>{activeCategory.slaHours > 0 ? `${activeCategory.slaHours}H SLA` : 'PORTAL'}</div>
-              <div className="text-sky-700 dark:text-sky-400">
-                {activeCategory.isInfoModule ? 'DIRECT' : '+50 CR'}
-              </div>
-            </div>
-
+          <div className="flex items-center shrink-0">
             <button
               type="button"
               onClick={() => onTriggerCategory(activeCategory.id)}
-              className={`min-h-[44px] px-4 sm:px-6 py-2 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
+              className={`min-h-[48px] px-5 sm:px-7 py-2.5 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
                 activeCategory.isInfoModule
-                  ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 text-xs font-semibold'
+                  ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 text-xs sm:text-sm font-semibold'
                   : 'bg-red-600 hover:bg-red-700 text-white border border-red-500 text-sm sm:text-base font-extrabold uppercase tracking-wider shadow-lg shadow-red-600/25'
               }`}
             >
               {activeCategory.isInfoModule ? (
                 <>
                   <span>Open</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-4 h-4" />
                 </>
               ) : (
                 <>
