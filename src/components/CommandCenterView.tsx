@@ -8,13 +8,13 @@ import {
   ChevronRight,
   FileText,
   GalleryHorizontalEnd,
-  Layers,
   LayoutGrid,
   Lock,
-  Map as MapIcon,
   MapPin,
+  Moon,
   Pencil,
   PhoneCall,
+  Sun,
   X,
 } from 'lucide-react';
 import { MUNICIPALITIES, PUBLIC_NOTICES_DATA, SERVICE_CATEGORIES } from '../data/civicSeedData';
@@ -23,21 +23,21 @@ import type {
   UserProfile,
   WardRecord,
 } from '../types/civic';
+import type { CardTimeMode } from '../utils/sastTime';
 import { ServiceCarousel } from './ServiceCarousel';
 import { ServiceTilesGrid } from './ServiceTilesGrid';
 
 interface CommandCenterViewProps {
   activeWard: WardRecord;
   user: UserProfile;
-  reportCount: number;
   emergencyMode: boolean;
   onToggleEmergency: () => void;
   onOpenReportModal: (categoryId: ServiceCategoryId) => void;
   onOpenAuthModal: () => void;
-  onOpenFeed: () => void;
-  onOpenMap: () => void;
   servicesLayout: 'carousel' | 'tiles';
   onChangeServicesLayout: (layout: 'carousel' | 'tiles') => void;
+  cardTimeMode: CardTimeMode;
+  onChangeCardTimeMode: (mode: CardTimeMode) => void;
 }
 
 const INCOME_BRACKETS = [
@@ -64,15 +64,14 @@ const WHISTLE_CATEGORIES = [
 export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
   activeWard,
   user,
-  reportCount,
   emergencyMode,
   onToggleEmergency,
   onOpenReportModal,
   onOpenAuthModal,
-  onOpenFeed,
-  onOpenMap,
   servicesLayout,
   onChangeServicesLayout,
+  cardTimeMode,
+  onChangeCardTimeMode,
 }) => {
   const [activeCategoryIdx, setActiveCategoryIdx] = useState(0);
   const [infoDrawer, setInfoDrawer] = useState<'accounts' | 'anticorruption' | 'notices' | null>(null);
@@ -196,24 +195,6 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
             <span className="sm:hidden">Ward</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenFeed}
-            className="min-h-[38px] px-3 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150 tabular-nums"
-          >
-            <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Feed ({reportCount})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenMap}
-            className="min-h-[38px] px-3 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150"
-          >
-            <MapIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Map</span>
-          </button>
-
           <div
             role="group"
             aria-label="Service cards layout"
@@ -240,7 +221,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
               aria-pressed={servicesLayout === 'tiles'}
               aria-label="Tiles grid layout"
               title="Tiles layout"
-              className={`min-h-[32px] px-2.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors duration-150 ${
+              className={`min-h-[32px] px-2.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                 servicesLayout === 'tiles'
                   ? 'bg-white text-slate-900 shadow-xs dark:bg-white dark:text-slate-950'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -248,6 +229,49 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
             >
               <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
               <span>Tiles</span>
+            </button>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Daytime AM or Nighttime PM card images"
+            className="flex items-center rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-100/80 dark:bg-white/[0.04] p-0.5"
+          >
+            <button
+              type="button"
+              onClick={() => onChangeCardTimeMode('am')}
+              aria-pressed={cardTimeMode === 'am'}
+              aria-label="Show AM daytime card images"
+              title="AM Daytime images (auto 06:00–19:00 SAST)"
+              className={`min-h-[32px] px-2.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
+                cardTimeMode === 'am'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-white dark:text-slate-950'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>AM</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeCardTimeMode('pm')}
+              aria-pressed={cardTimeMode === 'pm'}
+              aria-label="Show PM nighttime card images"
+              title="PM Nighttime images (auto 19:00–06:00 SAST)"
+              className={`min-h-[32px] px-2.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
+                cardTimeMode === 'pm'
+                  ? 'bg-slate-900 text-white shadow-xs dark:bg-white dark:text-slate-950'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Moon
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  cardTimeMode === 'pm'
+                    ? 'text-indigo-300 dark:text-indigo-600'
+                    : 'text-indigo-500 dark:text-indigo-400'
+                }`}
+              />
+              <span>PM</span>
             </button>
           </div>
         </div>
@@ -261,6 +285,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
           onSelectIndex={setActiveCategoryIdx}
           onTriggerCategory={handleCategoryTrigger}
           activeWard={activeWard}
+          cardTimeMode={cardTimeMode}
         />
       ) : (
         <ServiceCarousel
@@ -269,6 +294,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
           onSelectIndex={setActiveCategoryIdx}
           onTriggerCategory={handleCategoryTrigger}
           activeWard={activeWard}
+          cardTimeMode={cardTimeMode}
         />
       )}
 

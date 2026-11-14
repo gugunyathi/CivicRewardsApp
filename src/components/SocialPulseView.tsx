@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import {
   AtSign,
-  ChevronLeft,
-  ChevronRight,
   Link2,
   Loader2,
   MessageCircle,
@@ -60,12 +58,10 @@ export const SocialPulseView: React.FC<SocialPulseViewProps> = React.memo(({
   const [linkingSocialId, setLinkingSocialId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string>(reports[0]?.id ?? '');
   const [mobileTab, setMobileTab] = useState<'stream' | 'bridge'>('stream');
-  const [streamPage, setStreamPage] = useState(0);
+  const [visibleLimit, setVisibleLimit] = useState(4);
 
-  const pageSize = 2;
-  const totalPages = Math.max(1, Math.ceil(socialItems.length / pageSize));
-  const safePage = Math.min(streamPage, totalPages - 1);
-  const visibleSocialItems = socialItems.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const visibleSocialItems = socialItems.slice(0, visibleLimit);
+  const remainingSocialCount = Math.max(0, socialItems.length - visibleSocialItems.length);
 
   const handleIngest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,28 +290,8 @@ export const SocialPulseView: React.FC<SocialPulseViewProps> = React.memo(({
         >
           <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.08] pb-2">
             <span className="font-mono text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-              {safePage + 1} / {totalPages} · {socialItems.length} Alerts
+              Showing {visibleSocialItems.length} of {socialItems.length} Alerts
             </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={safePage === 0}
-                onClick={() => setStreamPage((p) => Math.max(0, p - 1))}
-                aria-label="Previous social page"
-                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                disabled={safePage >= totalPages - 1}
-                onClick={() => setStreamPage((p) => Math.min(totalPages - 1, p + 1))}
-                aria-label="Next social page"
-                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
           </div>
 
           {visibleSocialItems.map((item) => {
@@ -404,6 +380,18 @@ export const SocialPulseView: React.FC<SocialPulseViewProps> = React.memo(({
               </article>
             );
           })}
+
+          {remainingSocialCount > 0 && (
+            <div className="flex justify-center pt-1">
+              <button
+                type="button"
+                onClick={() => setVisibleLimit((n) => n + 4)}
+                className="min-h-[38px] px-4 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150 tabular-nums"
+              >
+                Show more ({remainingSocialCount} remaining)
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </div>

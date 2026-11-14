@@ -64,6 +64,7 @@ export interface ServiceCategory {
   refHint: string;
   slaHours: number;
   imageUrl: string;
+  dayImageUrl: string;
   isInfoModule?: boolean;
 }
 
@@ -117,6 +118,7 @@ export interface CivicReport {
   isEmergency: boolean;
   clusteredHouseholds: number;
   createdAtIso: string;
+  resolvedAtIso?: string | null;
   timeAgoLabel: string;
   slaDeadlineHours: number;
   slaElapsedHours: number;
@@ -210,6 +212,8 @@ export interface TownWardBillBenchmark {
   elecTariffPerKwh: number;
   slaResolutionScore: number;
 }
+
+export type UserRole = 'resident' | 'councillor';
 
 export type AppView =
   | 'hub'

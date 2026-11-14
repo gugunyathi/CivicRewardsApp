@@ -15,7 +15,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import type { AppView, UserProfile, WardRecord } from '../types/civic';
+import type { AppView, UserProfile, UserRole, WardRecord } from '../types/civic';
 
 interface BurgerMenuDrawerProps {
   isOpen: boolean;
@@ -24,6 +24,8 @@ interface BurgerMenuDrawerProps {
   onSelectView: (view: AppView) => void;
   activeWard: WardRecord;
   user: UserProfile;
+  role: UserRole;
+  onChangeRole: (role: UserRole) => void;
   darkMode: boolean;
   onToggleDarkMode: () => void;
   emergencyMode: boolean;
@@ -37,15 +39,15 @@ const MENU_ITEMS: Array<{
   label: string;
   hint: string;
   icon: React.ComponentType<{ className?: string }>;
+  councillorOnly?: boolean;
 }> = [
   { id: 'hub', label: 'Municipal Services', hint: '10 service channels', icon: Home },
   { id: 'feed', label: 'Ward Feed', hint: 'Live verified reports', icon: Layers },
   { id: 'map', label: 'Live Map', hint: 'Pins & ward boundaries', icon: MapIcon },
-  { id: 'desk', label: 'Councillor Desk', hint: 'SLA queue & routing', icon: ClipboardCheck },
+  { id: 'desk', label: 'Councillor Desk', hint: 'SLA queue & routing', icon: ClipboardCheck, councillorOnly: true },
   { id: 'social', label: 'Social Pulse', hint: 'WhatsApp & group alerts', icon: Radio },
   { id: 'directory', label: 'Ward Directory', hint: 'Metros & councillors', icon: Building2 },
-  { id: 'rewards', label: 'CivicRewards', hint: 'Credits & redemptions', icon: Award },
-  { id: 'profile', label: 'Profile & Bills', hint: 'Reports & utility trends', icon: User },
+  { id: 'profile', label: 'Profile, Bills & Rewards', hint: 'Reports, bills & vouchers', icon: User },
 ];
 
 export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
@@ -55,6 +57,8 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
   onSelectView,
   activeWard,
   user,
+  role,
+  onChangeRole,
   darkMode,
   onToggleDarkMode,
   emergencyMode,
@@ -73,17 +77,26 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
 
   if (!isOpen) return null;
 
+  const visibleMenuItems = MENU_ITEMS.filter((item) => !item.councillorOnly || role === 'councillor');
+
   return (
     <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Navigation Menu">
       <div className="w-80 max-w-[85vw] h-full bg-white dark:bg-[#111827] border-r border-slate-200/80 dark:border-white/10 rounded-r-2xl flex flex-col justify-between shadow-xl shadow-slate-900/15 ui-drawer-left overflow-hidden">
         <div className="p-5 space-y-4 overflow-y-auto overscroll-contain">
           <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-white/[0.08]">
-            <div>
-              <div className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white">
-                Navigation
-              </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                Swipe left or right to switch views
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img
+                src="/assets/logo-mark.png"
+                alt="CivicRewards logo"
+                className="w-9 h-9 rounded-xl bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+              />
+              <div className="min-w-0">
+                <div className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white truncate">
+                  CivicRewards
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {role === 'councillor' ? 'Councillor Desk Mode' : 'Resident Citizen Portal'}
+                </div>
               </div>
             </div>
             <button
@@ -94,6 +107,39 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
             >
               <X className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* Resident / Councillor Role Switcher */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              View Mode
+            </div>
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/[0.08]">
+              <button
+                type="button"
+                onClick={() => onChangeRole('resident')}
+                aria-pressed={role === 'resident'}
+                className={`min-h-[34px] rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-150 ${
+                  role === 'resident'
+                    ? 'bg-white text-slate-900 shadow-xs dark:bg-white dark:text-slate-950'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Resident
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRole('councillor')}
+                aria-pressed={role === 'councillor'}
+                className={`min-h-[34px] rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-150 ${
+                  role === 'councillor'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Councillor
+              </button>
+            </div>
           </div>
 
           {/* Active Ward Profile Card */}
@@ -122,9 +168,10 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
 
           {/* Pages */}
           <nav className="space-y-1">
-            {MENU_ITEMS.map((item) => {
+            {visibleMenuItems.map((item) => {
               const Icon = item.icon;
-              const active = activeView === item.id;
+              const active =
+                activeView === item.id || (item.id === 'profile' && activeView === 'rewards');
               return (
                 <button
                   key={item.id}

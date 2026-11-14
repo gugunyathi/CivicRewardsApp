@@ -21,27 +21,45 @@ interface InteractiveMapProps {
   selectedReportId?: string | null;
   onSelectReport?: (report: CivicReport) => void;
   onSelectWard?: (ward: WardRecord) => void;
+  onClearSelection?: () => void;
 }
 
-function statusColor(report: CivicReport): string {
-  if (report.forensics.status === 'FLAGGED_SYNTHETIC') return '#dc2626';
-  if (report.status === 'Resolved') return '#059669';
-  if (report.isEmergency || report.severity === 'CRITICAL') return '#ea580c';
-  return '#0f172a';
+// Ward 115 (CoJ) boundary covering Fourways, Cedar Rd, Craigavon, Douglasdale & Bloubosrand
+const WARD_115_POLYGON: Array<[number, number]> = [
+  [-26.0045, 27.9920],
+  [-26.0058, 28.0125],
+  [-26.0145, 28.0265],
+  [-26.0285, 28.0278],
+  [-26.0415, 28.0155],
+  [-26.0432, 27.9945],
+  [-26.0345, 27.9815],
+  [-26.0175, 27.9835],
+];
+
+export function getReportPinColor(report: CivicReport): string {
+  if (report.status === 'Resolved') return '#10b981'; // Green
+  if (report.status === 'Escalated to Depot' || report.status === 'Technician Dispatched') {
+    return '#f97316'; // Orange
+  }
+  return '#ef4444'; // Red (Logged / Pending / Blocked)
 }
 
 function createPinIcon(color: string, label: string, selected = false, pulse = false) {
-  const size = selected ? 36 : 28;
+  const size = selected ? 32 : 20;
   const ring = selected
-    ? `<circle cx="18" cy="18" r="15" fill="${color}" fill-opacity="0.22" stroke="${color}" stroke-width="2" />`
+    ? `<circle cx="16" cy="16" r="14" fill="${color}" fill-opacity="0.24" stroke="${color}" stroke-width="2" />`
+    : '';
+  const innerRadius = selected ? 9 : 6.5;
+  const labelText = selected
+    ? `<text x="16" y="19" text-anchor="middle" fill="#ffffff" font-size="8.5" font-weight="800" font-family="ui-monospace, monospace">${label}</text>`
     : '';
   return L.divIcon({
     className: `civic-map-pin${pulse ? ' civic-map-pin-pulse' : ''}`,
-    html: `<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;">
-      <svg width="${size}" height="${size}" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    html: `<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.45));">
+      <svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
         ${ring}
-        <circle cx="18" cy="18" r="10" fill="${color}" stroke="#ffffff" stroke-width="2.5"/>
-        <text x="18" y="21.5" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="700" font-family="monospace">${label}</text>
+        <circle cx="16" cy="16" r="${innerRadius}" fill="${color}" stroke="#ffffff" stroke-width="2"/>
+        ${labelText}
       </svg>
     </div>`,
     iconSize: [size, size],
@@ -66,6 +84,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = React.memo(({
   selectedReportId,
   onSelectReport,
   onSelectWard,
+  onClearSelection,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -77,8 +96,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = React.memo(({
     lng: centerLng,
     zoom,
   });
-  const callbacksRef = useRef({ onPickLocation, onSelectReport, onSelectWard });
-  callbacksRef.current = { onPickLocation, onSelectReport, onSelectWard };
+  const callbacksRef = useRef({ onPickLocation, onSelectReport, onSelectWard, onClearSelection });
+  callbacksRef.current = { onPickLocation, onSelectReport, onSelectWard, onClearSelection };
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -101,6 +120,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = React.memo(({
     }
     L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
     const group = L.layerGroup().addTo(map);
+
+    if (mode === 'explorer') {
+      map.on('click', () => {
+        callbacksRef.current.onClearSelection?.();
+      });
+    }
 
     mapRef.current = map;
     layerGroupRef.current = group;
@@ -158,7 +183,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = React.memo(({
     if (!pickerMarkerRef.current) {
       const marker = L.marker([lat, lng], {
         draggable: interactive,
-        icon: createPinIcon('#059669', '+', true),
+        icon: createPinIcon('#10b981', '+', true),
       }).addTo(map);
 
       marker.on('dragend', () => {
@@ -191,33 +216,49 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = React.memo(({
     group.clearLayers();
 
     wards.forEach((ward) => {
-      const circle = L.circle([ward.lat, ward.lng], {
-        radius: 1400,
-        color: '#10b981',
-        weight: 1.5,
-        opacity: 0.55,
-        fillColor: '#059669',
-        fillOpacity: 0.06,
+      const shape =
+        ward.id === 'CoJ-115'
+          ? L.polygon(WARD_115_POLYGON, {
+              color: '#10b981',
+              weight: 2,
+              opacity: 0.75,
+              dashArray: '5 4',
+              fillColor: '#059669',
+              fillOpacity: 0.07,
+            })
+          : L.circle([ward.lat, ward.lng], {
+              radius: 1400,
+              color: '#10b981',
+              weight: 1.5,
+              opacity: 0.5,
+              fillColor: '#059669',
+              fillOpacity: 0.05,
+            });
+
+      shape.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        callbacksRef.current.onSelectWard?.(ward);
       });
-      circle.on('click', () => callbacksRef.current.onSelectWard?.(ward));
-      circle.bindTooltip(`Ward ${ward.wardNumber} · ${ward.suburbs[0]}`, {
+      shape.bindTooltip(`Ward ${ward.wardNumber} · ${ward.suburbs[0]}`, {
         direction: 'top',
       });
-      circle.addTo(group);
+      shape.addTo(group);
     });
 
     reports.forEach((report) => {
       const isSelected = report.id === selectedReportId;
-      const color = statusColor(report);
-      const pulse =
-        !isSelected && (report.isEmergency || report.severity === 'CRITICAL') && report.status !== 'Resolved';
+      const color = getReportPinColor(report);
+      const pulse = !isSelected && report.status !== 'Resolved' && (report.isEmergency || report.severity === 'CRITICAL');
 
       const marker = L.marker([report.lat, report.lng], {
         icon: createPinIcon(color, String(report.wardNumber), isSelected, pulse),
       });
 
-      marker.on('click', () => callbacksRef.current.onSelectReport?.(report));
-      marker.bindTooltip(`${report.id} · ${report.title}`, { direction: 'top' });
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        callbacksRef.current.onSelectReport?.(report);
+      });
+      marker.bindTooltip(`${report.status} · ${report.title}`, { direction: 'top' });
       marker.addTo(group);
     });
   }, [mode, reports, wards, selectedReportId]);

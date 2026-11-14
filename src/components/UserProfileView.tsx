@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Award,
   BarChart3,
@@ -19,8 +19,8 @@ import {
   User,
   Zap,
 } from 'lucide-react';
-import { SEED_WARD_TOWN_BENCHMARKS, SEED_WARDS } from '../data/civicSeedData';
-import { SmartImage } from './SmartImage';
+import { REWARD_OFFERS, SEED_WARD_TOWN_BENCHMARKS, SEED_WARDS } from '../data/civicSeedData';
+import { AvatarPlaceholder, RewardCategoryIcon, SmartImage } from './SmartImage';
 import { EscalationPanel } from './EscalationPanel';
 import { SlaCountdown } from './SlaCountdown';
 import { openWhatsAppShare } from '../utils/share';
@@ -32,22 +32,23 @@ import type {
   WardRecord,
 } from '../types/civic';
 
+export type ProfileTab = 'reports' | 'points' | 'bills' | 'compare';
+
 interface UserProfileViewProps {
   user: UserProfile;
   activeWard: WardRecord;
   reports: CivicReport[];
   transactions: RewardTransaction[];
   monthlyBills: MonthlyMunicipalBill[];
+  initialTab?: ProfileTab;
   onUpdateCurrentBill: (updated: MonthlyMunicipalBill) => void;
   onOpenAuthModal: () => void;
   onOpenReportModal: () => void;
-  onOpenRewards: () => void;
+  onRedeemOffer: (offerId: string, cost: number, title: string) => boolean;
   onVerifyResolution: (reportId: string) => void;
   onAttachRef: (reportId: string, refCode: string) => void;
   onSendSlaReminder: (reportId: string) => void;
 }
-
-type ProfileTab = 'reports' | 'points' | 'bills' | 'compare';
 type BillMetric = 'total' | 'water' | 'electricity' | 'rates' | 'taxes';
 
 const METRIC_LABELS: Record<BillMetric, string> = {
@@ -100,21 +101,27 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
   reports,
   transactions,
   monthlyBills,
+  initialTab,
   onUpdateCurrentBill,
   onOpenAuthModal,
   onOpenReportModal,
-  onOpenRewards,
+  onRedeemOffer,
   onVerifyResolution,
   onAttachRef,
   onSendSlaReminder,
 }) => {
-  const [tab, setTab] = useState<ProfileTab>('reports');
+  const [tab, setTab] = useState<ProfileTab>(initialTab ?? 'reports');
+  const [issuedVoucher, setIssuedVoucher] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+  }, [initialTab]);
 
   const [reportFilter, setReportFilter] = useState<'all' | 'active' | 'resolved'>('all');
-  const [reportPage, setReportPage] = useState(0);
+  const [repLimit, setRepLimit] = useState(4);
 
   const [txFilter, setTxFilter] = useState<'all' | 'earn' | 'redeem'>('all');
-  const [txPage, setTxPage] = useState(0);
+  const [txLimit, setTxLimit] = useState(6);
 
   const [billMetric, setBillMetric] = useState<BillMetric>('total');
   const [selectedMonthIdx, setSelectedMonthIdx] = useState(Math.max(0, monthlyBills.length - 1));
@@ -157,9 +164,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
     [myReports, reportFilter]
   );
 
-  const repTotalPages = Math.max(1, Math.ceil(filteredReports.length / 2));
-  const safeRepPage = Math.min(reportPage, repTotalPages - 1);
-  const visibleReports = filteredReports.slice(safeRepPage * 2, safeRepPage * 2 + 2);
+  const visibleReports = filteredReports.slice(0, repLimit);
+  const remainingReports = Math.max(0, filteredReports.length - visibleReports.length);
 
   const { totalEarned, totalCashedOut } = useMemo(
     () => ({
@@ -173,9 +179,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
     () => transactions.filter((t) => (txFilter === 'all' ? true : t.type === txFilter)),
     [transactions, txFilter]
   );
-  const txTotalPages = Math.max(1, Math.ceil(filteredTx.length / 3));
-  const safeTxPage = Math.min(txPage, txTotalPages - 1);
-  const visibleTx = filteredTx.slice(safeTxPage * 3, safeTxPage * 3 + 3);
+  const visibleTx = filteredTx.slice(0, txLimit);
+  const remainingTx = Math.max(0, filteredTx.length - visibleTx.length);
 
   const safeMonthIdx = Math.min(selectedMonthIdx, Math.max(0, monthlyBills.length - 1));
   const activeBill = monthlyBills[safeMonthIdx] ?? latestBill;
@@ -278,7 +283,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
             onClick={() => {
               setTab('reports');
               setReportFilter('resolved');
-              setReportPage(0);
+              setRepLimit(4);
             }}
             className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] text-left cursor-pointer hover:border-emerald-600/50 border border-transparent transition-colors duration-150"
           >
@@ -292,7 +297,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
             onClick={() => {
               setTab('points');
               setTxFilter('earn');
-              setTxPage(0);
+              setTxLimit(6);
             }}
             className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] text-left cursor-pointer hover:border-emerald-600/50 border border-transparent transition-colors duration-150"
           >
@@ -306,7 +311,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
             onClick={() => {
               setTab('points');
               setTxFilter('redeem');
-              setTxPage(0);
+              setTxLimit(6);
             }}
             className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] text-left cursor-pointer hover:border-emerald-600/50 border border-transparent transition-colors duration-150"
           >
@@ -365,7 +370,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
                   type="button"
                   onClick={() => {
                     setReportFilter(f.id);
-                    setReportPage(0);
+                    setRepLimit(4);
                   }}
                   className={`min-h-[34px] px-3 rounded-xl text-xs font-mono cursor-pointer transition-colors duration-150 tabular-nums ${
                     reportFilter === f.id
@@ -378,27 +383,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
               ))}
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[11px] text-slate-400 tabular-nums">
-                {safeRepPage + 1} / {repTotalPages}
-              </span>
-              <button
-                type="button"
-                disabled={safeRepPage === 0}
-                onClick={() => setReportPage((p) => Math.max(0, p - 1))}
-                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                disabled={safeRepPage >= repTotalPages - 1}
-                onClick={() => setReportPage((p) => Math.min(repTotalPages - 1, p + 1))}
-                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+            <span className="font-mono text-[11px] text-slate-400 tabular-nums">
+              Showing {visibleReports.length} of {filteredReports.length}
+            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -490,17 +477,41 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
               );
             })}
           </div>
+          {remainingReports > 0 && (
+            <div className="flex justify-center pt-1">
+              <button
+                type="button"
+                onClick={() => setRepLimit((n) => n + 4)}
+                className="min-h-[38px] px-4 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150 tabular-nums"
+              >
+                Show more ({remainingReports} remaining)
+              </button>
+            </div>
+          )}
         </section>
       )}
 
-      {/* TAB 2: EARNED POINTS, HISTORY & CASHED OUT POINTS */}
+      {/* TAB 2: CIVICREWARDS LEDGER, REDEEM VOUCHERS & HISTORY */}
       {tab === 'points' && (
-        <section className="space-y-3">
-          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-4 flex flex-wrap items-center justify-between gap-2.5">
+        <section className="space-y-4">
+          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img
+                src="/assets/logo-mark.png"
+                alt="CivicRewards logo"
+                className="w-9 h-9 rounded-xl bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+              />
+              <div>
+                <div className="text-[11px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                  CivicRewards Credits & Vouchers
+                </div>
+                <div className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white tabular-nums">
+                  {user.credits.toLocaleString()} Available CR
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-3 text-xs font-mono tabular-nums">
-              <span>
-                Available: <strong className="text-slate-900 dark:text-white">{user.credits} CR</strong>
-              </span>
               <span className="text-emerald-600 dark:text-emerald-400">
                 Earned: <strong>+{totalEarned} CR</strong>
               </span>
@@ -508,90 +519,149 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
                 Cashed Out: <strong>-{totalCashedOut} CR</strong>
               </span>
             </div>
-
-            <button
-              type="button"
-              onClick={onOpenRewards}
-              className="min-h-[36px] px-3.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
-            >
-              <Gift className="w-3.5 h-3.5" />
-              <span>Cash Out Points</span>
-            </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              {(
-                [
-                  { id: 'all', label: `All (${transactions.length})` },
-                  { id: 'earn', label: 'Earned (+)' },
-                  { id: 'redeem', label: 'Cashed Out (-)' },
-                ] as const
-              ).map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => {
-                    setTxFilter(f.id);
-                    setTxPage(0);
-                  }}
-                  className={`min-h-[34px] px-3 rounded-xl text-xs font-mono cursor-pointer transition-colors duration-150 ${
-                    txFilter === f.id
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
-                      : 'border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  {f.label}
-                </button>
+          {issuedVoucher && (
+            <div className="p-3.5 rounded-xl bg-emerald-600/10 border border-emerald-600/30 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between gap-2">
+              <span>{issuedVoucher}</span>
+              <button
+                type="button"
+                onClick={() => setIssuedVoucher(null)}
+                className="font-semibold underline cursor-pointer shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Partner Vouchers & Cash Out */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">
+                Partner Vouchers & Airtime
+              </h2>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                +50 CR photo · +30 CR fix check · +15 CR +1
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {REWARD_OFFERS.map((offer) => {
+                const canAfford = user.credits >= offer.costCredits;
+                return (
+                  <div
+                    key={offer.id}
+                    className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 flex flex-col justify-between gap-3"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <AvatarPlaceholder name={offer.partner} className="w-7 h-7 text-[10px]" />
+                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 truncate">
+                            {offer.partner}
+                          </span>
+                        </div>
+                        <span className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-slate-50 dark:bg-white/[0.04] text-amber-600 dark:text-amber-400">
+                          <RewardCategoryIcon category={offer.category} />
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-slate-900 dark:text-white">{offer.title}</div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{offer.description}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!canAfford}
+                      onClick={() => {
+                        const ok = onRedeemOffer(offer.id, offer.costCredits, offer.title);
+                        if (ok) {
+                          const code = `CP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+                          setIssuedVoucher(
+                            `Redeemed ${offer.title}! PIN ${code} sent to ${user.mobileZa || 'your account'}.`
+                          );
+                        }
+                      }}
+                      className="w-full h-9 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 disabled:opacity-40 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150 tabular-nums"
+                    >
+                      <Gift className="w-3.5 h-3.5" />
+                      <span>Redeem ({offer.costCredits} cr)</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Points Ledger History */}
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                {(
+                  [
+                    { id: 'all', label: `All (${transactions.length})` },
+                    { id: 'earn', label: 'Earned (+)' },
+                    { id: 'redeem', label: 'Cashed Out (-)' },
+                  ] as const
+                ).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => {
+                      setTxFilter(f.id);
+                      setTxLimit(6);
+                    }}
+                    className={`min-h-[34px] px-3 rounded-xl text-xs font-mono cursor-pointer transition-colors duration-150 ${
+                      txFilter === f.id
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
+                        : 'border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <span className="font-mono text-[11px] text-slate-400 tabular-nums">
+                Showing {visibleTx.length} of {filteredTx.length}
+              </span>
+            </div>
+
+            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] divide-y divide-slate-100 dark:divide-white/[0.06] overflow-hidden">
+              {visibleTx.map((tx) => (
+                <div key={tx.id} className="p-3.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                      {tx.title}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {tx.subtitle}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 mt-0.5">{tx.timestampLabel}</div>
+                  </div>
+                  <div
+                    className={`font-mono text-sm font-bold tabular-nums shrink-0 ${
+                      tx.type === 'earn'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {tx.type === 'earn' ? `+${tx.points} CR` : `-${tx.points} CR`}
+                  </div>
+                </div>
               ))}
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[11px] text-slate-400 tabular-nums">
-                {safeTxPage + 1} / {txTotalPages}
-              </span>
-              <button
-                type="button"
-                disabled={safeTxPage === 0}
-                onClick={() => setTxPage((p) => Math.max(0, p - 1))}
-                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                disabled={safeTxPage >= txTotalPages - 1}
-                onClick={() => setTxPage((p) => Math.min(txTotalPages - 1, p + 1))}
-                className="min-h-[32px] min-w-[32px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] divide-y divide-slate-100 dark:divide-white/[0.06] overflow-hidden">
-            {visibleTx.map((tx) => (
-              <div key={tx.id} className="p-3.5 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                    {tx.title}
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                    {tx.subtitle}
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-400 mt-0.5">{tx.timestampLabel}</div>
-                </div>
-                <div
-                  className={`font-mono text-sm font-bold tabular-nums shrink-0 ${
-                    tx.type === 'earn'
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-slate-600 dark:text-slate-300'
-                  }`}
+            {remainingTx > 0 && (
+              <div className="flex justify-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => setTxLimit((n) => n + 6)}
+                  className="min-h-[38px] px-4 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150 tabular-nums"
                 >
-                  {tx.type === 'earn' ? `+${tx.points} CR` : `-${tx.points} CR`}
-                </div>
+                  Show more ({remainingTx} remaining)
+                </button>
               </div>
-            ))}
+            )}
           </div>
         </section>
       )}

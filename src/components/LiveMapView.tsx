@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   ExternalLink,
   Layers,
+  Loader2,
   LocateFixed,
   MessageCircle,
   Plus,
@@ -14,11 +16,12 @@ import {
   X,
 } from 'lucide-react';
 import { SEED_WARDS } from '../data/civicSeedData';
-import type { CivicReport, WardRecord } from '../types/civic';
+import type { CivicReport, ReportStatus, WardRecord } from '../types/civic';
 import { BASEMAP_ORDER, BASEMAPS, osmDirectionsUrl, type BasemapId } from '../utils/mapTiles';
 import { openWhatsAppShare } from '../utils/share';
+import { VERIFY_FIX_POINTS, getVerificationWindowState } from '../utils/verificationWindow';
 import { resolveWardByCoordinates } from '../utils/wardResolver';
-import { InteractiveMap } from './InteractiveMap';
+import { InteractiveMap, getReportPinColor } from './InteractiveMap';
 import { RefBadge } from './RefBadge';
 import { SlaCountdown } from './SlaCountdown';
 import { SmartImage } from './SmartImage';
@@ -27,9 +30,10 @@ interface LiveMapViewProps {
   reports: CivicReport[];
   activeWard: WardRecord;
   darkMode: boolean;
+  verifiedFixIds: string[];
   onSelectWard: (wardId: string) => void;
-  onCorroborate: (reportId: string) => void;
-  onVerifyResolution: (reportId: string) => void;
+  onCorroborate: (reportId: string) => boolean;
+  onVerifyResolution: (reportId: string, report?: CivicReport) => boolean;
   onOpenReportModal: () => void;
 }
 
@@ -42,48 +46,153 @@ const METRO_PRESETS = [
 ] as const;
 
 const MAP_LEGEND = [
-  { color: '#0f172a', label: 'Active' },
-  { color: '#059669', label: 'Resolved' },
-  { color: '#ea580c', label: 'Critical' },
-  { color: '#dc2626', label: 'Blocked' },
+  { color: '#ef4444', label: 'Pending' },
+  { color: '#f97316', label: 'Escalated' },
+  { color: '#10b981', label: 'Resolved' },
 ] as const;
+
+type MapStatusFilter = 'all' | 'pending' | 'escalated' | 'resolved';
+
+const STATUS_FILTER_PILLS: Array<{ value: MapStatusFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'escalated', label: 'Escalated' },
+  { value: 'resolved', label: 'Resolved' },
+];
+
+function getWardMapFocus(ward: WardRecord) {
+  if (ward.id === 'CoJ-115') {
+    return { lat: -26.024, lng: 28.011, zoom: 13 };
+  }
+  return { lat: ward.lat, lng: ward.lng, zoom: 13 };
+}
+
+function getBucket(status: ReportStatus): Exclude<MapStatusFilter, 'all'> {
+  if (status === 'Resolved') return 'resolved';
+  if (status === 'Escalated to Depot' || status === 'Technician Dispatched') return 'escalated';
+  return 'pending';
+}
 
 export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
   reports,
   activeWard,
   darkMode,
+  verifiedFixIds,
   onSelectWard,
   onCorroborate,
   onVerifyResolution,
   onOpenReportModal,
 }) => {
-  const [mapFocus, setMapFocus] = useState<{ lat: number; lng: number; zoom: number }>({
-    lat: activeWard.lat,
-    lng: activeWard.lng,
-    zoom: 13,
-  });
-  const [selectedReport, setSelectedReport] = useState<CivicReport | null>(
-    reports.find((r) => r.wardId === activeWard.id) ?? reports[0] ?? null
+  const [mapFocus, setMapFocus] = useState<{ lat: number; lng: number; zoom: number }>(() =>
+    getWardMapFocus(activeWard)
   );
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'VERIFIED'>('ALL');
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<MapStatusFilter>('all');
   const [presetIdx, setPresetIdx] = useState(0);
   const [basemap, setBasemap] = useState<BasemapId | undefined>(undefined);
 
+  const [ward115Pins, setWard115Pins] = useState<CivicReport[]>([]);
+  const [ward115Stats, setWard115Stats] = useState<{ pinnedTotal: number; unmappedCount: number } | null>(null);
+  const [loadingWard115, setLoadingWard115] = useState(false);
+
+  // Local instant UI overrides for live pins when user clicks +1 Me Too or Verify Fix
+  const [pinOverrides, setPinOverrides] = useState<
+    Record<string, { status?: ReportStatus; resolvedAtIso?: string; addedHouseholds?: number; addedVerified?: number }>
+  >({});
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (presetIdx === 0) {
+      setMapFocus(getWardMapFocus(activeWard));
+    }
+  }, [activeWard, presetIdx]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingWard115(true);
+    fetch('/api/ward115/map')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        if (Array.isArray(data.pins) && data.pins.length > 0) {
+          setWard115Pins(data.pins as CivicReport[]);
+          setWard115Stats({
+            pinnedTotal: Number(data.pinnedTotal ?? data.pins.length),
+            unmappedCount: Number(data.unmappedCount ?? 0),
+          });
+        }
+      })
+      .catch(() => {
+        // Silent fallback to local seeded Ward 115 pins
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWard115(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedReportId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedReportId(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedReportId]);
+
+  const mergedReports = useMemo(() => {
+    const map = new Map<string, CivicReport>();
+    for (const r of ward115Pins) {
+      map.set(r.id, r);
+    }
+    for (const r of reports) {
+      map.set(r.id, r);
+    }
+    return Array.from(map.values()).map((r) => {
+      const ov = pinOverrides[r.id];
+      if (!ov) return r;
+      return {
+        ...r,
+        status: ov.status ?? r.status,
+        resolvedAtIso: ov.resolvedAtIso ?? r.resolvedAtIso,
+        clusteredHouseholds: r.clusteredHouseholds + (ov.addedHouseholds ?? 0),
+        verifiedByResidents: r.verifiedByResidents + (ov.addedVerified ?? 0),
+      };
+    });
+  }, [reports, ward115Pins, pinOverrides]);
+
   const visibleReports = useMemo(
     () =>
-      reports.filter((r) => {
-        if (statusFilter === 'ACTIVE') return r.status !== 'Resolved' && r.status !== 'Blocked by AI Forensics';
-        if (statusFilter === 'VERIFIED') return r.forensics.status === 'VERIFIED';
-        return true;
+      mergedReports.filter((r) => {
+        if (statusFilter === 'all') return true;
+        return getBucket(r.status) === statusFilter;
       }),
-    [reports, statusFilter]
+    [mergedReports, statusFilter]
   );
+
+  const selectedReport = useMemo(
+    () => (selectedReportId ? visibleReports.find((r) => r.id === selectedReportId) ?? null : null),
+    [visibleReports, selectedReportId]
+  );
+
+  const selectedVerifyState = useMemo(
+    () => (selectedReport ? getVerificationWindowState(selectedReport, verifiedFixIds, nowMs) : null),
+    [selectedReport, verifiedFixIds, nowMs]
+  );
+
+  useEffect(() => {
+    if (!selectedVerifyState?.withinWindow) return;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [selectedVerifyState?.withinWindow]);
 
   const handlePreset = (idx: number) => {
     setPresetIdx(idx);
     const item = METRO_PRESETS[idx];
     if (item.code === 'ACTIVE') {
-      setMapFocus({ lat: activeWard.lat, lng: activeWard.lng, zoom: 13 });
+      setMapFocus(getWardMapFocus(activeWard));
     } else {
       setMapFocus({ lat: item.lat, lng: item.lng, zoom: item.zoom });
     }
@@ -98,12 +207,47 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
           setMapFocus({ lat: pos.coords.latitude, lng: pos.coords.longitude, zoom: 14 });
         },
         () => {
-          setMapFocus({ lat: activeWard.lat, lng: activeWard.lng, zoom: 14 });
+          setMapFocus(getWardMapFocus(activeWard));
         },
         { timeout: 3500 }
       );
     }
   };
+
+  const handlePinCorroborate = (reportId: string) => {
+    const ok = onCorroborate(reportId);
+    if (!ok) return;
+    setPinOverrides((prev) => ({
+      ...prev,
+      [reportId]: {
+        ...prev[reportId],
+        addedHouseholds: (prev[reportId]?.addedHouseholds ?? 0) + 1,
+      },
+    }));
+  };
+
+  const handlePinVerify = (report: CivicReport) => {
+    const ok = onVerifyResolution(report.id, report);
+    if (!ok) return;
+    const nowIso = new Date().toISOString();
+    setPinOverrides((prev) => ({
+      ...prev,
+      [report.id]: {
+        ...prev[report.id],
+        status: 'Resolved',
+        resolvedAtIso: report.resolvedAtIso ?? prev[report.id]?.resolvedAtIso ?? nowIso,
+        addedVerified: (prev[report.id]?.addedVerified ?? 0) + 1,
+      },
+    }));
+  };
+
+  const wardVisibleCount = useMemo(
+    () =>
+      activeWard.id === 'CoJ-115' && ward115Stats
+        ? ward115Stats.pinnedTotal + reports.filter((r) => r.wardId === 'CoJ-115').length
+        : visibleReports.length,
+    [activeWard.id, ward115Stats, reports, visibleReports.length]
+  );
 
   return (
     <div className="space-y-3">
@@ -111,10 +255,10 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
           <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Live Ward & Fault Map
+            Ward {activeWard.wardNumber} — Live Map
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Ward {activeWard.wardNumber} ({activeWard.suburbs[0]}) · Tap a pin or ward boundary
+            {activeWard.suburbs[0]} · Tap any green, orange, or red pin to inspect, +1 Me Too, or verify fix
           </p>
         </div>
 
@@ -156,15 +300,16 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
         </div>
       </div>
 
-      {/* Basemap switcher + legend */}
+      {/* Basemap switcher + Pin counts */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           className="flex items-center gap-1 p-1 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08]"
           role="group"
-          aria-label="Basemap style"
+          aria-label="Mapbox basemap style"
         >
-          <span className="pl-1.5 pr-0.5 text-slate-400" title="OpenStreetMap basemaps">
+          <span className="pl-1.5 pr-1 text-slate-400 flex items-center gap-1 text-[10px] font-mono font-semibold" title="Mapbox Styles">
             <Layers className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Mapbox</span>
           </span>
           {BASEMAP_ORDER.map((id) => (
             <button
@@ -183,11 +328,11 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
           ))}
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-3 text-[11px] font-medium text-slate-600 dark:text-slate-300">
           {MAP_LEGEND.map((item) => (
             <span key={item.label} className="flex items-center gap-1.5">
               <span
-                className="w-2.5 h-2.5 rounded-full border border-white/60"
+                className="w-2.5 h-2.5 rounded-full border border-white/70 shrink-0"
                 style={{ backgroundColor: item.color }}
               />
               {item.label}
@@ -196,8 +341,8 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
         </div>
       </div>
 
-      {/* Viewport-Contained Active Map Frame */}
-      <div className="relative h-[calc(100dvh-275px)] min-h-[380px] max-h-[660px] rounded-2xl border border-slate-200/80 dark:border-white/[0.08] overflow-hidden bg-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      {/* Viewport-Contained Live Map Frame (Signal Desk Ward 115 style) */}
+      <div className="relative h-[calc(100dvh-248px)] min-h-[430px] max-h-[680px] rounded-2xl border border-slate-200/80 dark:border-white/[0.08] overflow-hidden bg-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <InteractiveMap
           centerLat={mapFocus.lat}
           centerLng={mapFocus.lng}
@@ -210,31 +355,52 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
           wards={SEED_WARDS}
           selectedReportId={selectedReport?.id ?? null}
           onSelectReport={(rep) => {
-            setSelectedReport(rep);
+            setSelectedReportId(rep.id);
             setMapFocus({ lat: rep.lat, lng: rep.lng, zoom: 14 });
           }}
           onSelectWard={(ward) => {
             onSelectWard(ward.id);
-            setMapFocus({ lat: ward.lat, lng: ward.lng, zoom: 13 });
+            setSelectedReportId(null);
+            setMapFocus(getWardMapFocus(ward));
           }}
+          onClearSelection={() => setSelectedReportId(null)}
         />
 
-        {/* Top-Left Map Filter Bar */}
-        <div className="absolute top-3 left-3 z-[400] flex items-center gap-1 p-1 rounded-xl bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md border border-slate-200/80 dark:border-white/12">
-          {(['ALL', 'ACTIVE', 'VERIFIED'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setStatusFilter(f)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold cursor-pointer transition-colors duration-150 ${
-                statusFilter === f
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+        {/* Top-Left Signal Desk Ward Live Map Overlay + Status Filter Pills */}
+        <div className="absolute top-3 left-3 z-[400] max-w-[calc(100%-150px)] rounded-xl bg-slate-950/85 text-white backdrop-blur-md border border-white/15 px-3 py-2 space-y-1.5 shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold tracking-tight text-white">
+              Ward {activeWard.wardNumber} — Live Map
+            </span>
+            {loadingWard115 && (
+              <Loader2 className="w-3 h-3 animate-spin text-emerald-400 shrink-0" />
+            )}
+          </div>
+          <div className="text-[10px] font-mono text-white/60 tabular-nums">
+            {wardVisibleCount.toLocaleString()} pinned
+            {activeWard.id === 'CoJ-115' && ward115Stats && ward115Stats.unmappedCount > 0
+              ? ` · +${ward115Stats.unmappedCount.toLocaleString()} unmapped`
+              : ''}
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {STATUS_FILTER_PILLS.map((pill) => {
+              const active = statusFilter === pill.value;
+              return (
+                <button
+                  key={pill.value}
+                  type="button"
+                  onClick={() => setStatusFilter(pill.value)}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors duration-150 cursor-pointer ${
+                    active
+                      ? 'bg-emerald-500 border-emerald-400 text-slate-950'
+                      : 'bg-transparent border-white/15 text-white/75 hover:text-white'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Top-Right Locate & Quick Report */}
@@ -243,7 +409,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
             type="button"
             onClick={handleLocateMe}
             title="Center on my GPS location"
-            className="min-h-[38px] px-3 rounded-xl bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md border border-slate-200/80 dark:border-white/12 text-xs font-medium text-slate-800 dark:text-white flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+            className="min-h-[38px] px-3 rounded-xl bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md border border-slate-200/80 dark:border-white/15 text-xs font-medium text-slate-800 dark:text-white flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
           >
             <LocateFixed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden sm:inline">My GPS</span>
@@ -259,22 +425,53 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
           </button>
         </div>
 
-        {/* Compact Selected Incident Overlay Card */}
+        {/* Bottom-Left Floating Report Status Legend (Signal Desk style) */}
+        {!selectedReport && (
+          <div className="absolute bottom-7 left-3 z-[400] rounded-xl bg-slate-950/85 border border-white/15 backdrop-blur-md px-3 py-2 text-white shadow-lg pointer-events-none">
+            <div className="text-[9px] font-bold uppercase tracking-wider text-white/50 mb-1">
+              Report status
+            </div>
+            <div className="space-y-1">
+              {MAP_LEGEND.map((item) => (
+                <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-white/80">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pin Popup Preview Card (only shown when a user clicks a pin) */}
         {selectedReport && (
-          <div className="absolute bottom-3 left-3 right-14 sm:right-auto sm:w-96 z-[400] rounded-2xl bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border border-slate-200/80 dark:border-white/12 shadow-xl overflow-hidden">
-            <div className="flex gap-3 p-3.5">
+          <div
+            role="dialog"
+            aria-label={`Report preview ${selectedReport.id}`}
+            className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-[376px] z-[500] rounded-2xl bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border border-slate-200/80 dark:border-white/15 shadow-2xl overflow-hidden ui-modal-enter"
+          >
+            <div className="flex items-start gap-3 p-3">
               <SmartImage
                 src={selectedReport.photoUrl}
                 alt={selectedReport.title}
                 categoryId={selectedReport.categoryId}
                 label={selectedReport.categoryId}
                 className="w-20 h-20 rounded-xl shrink-0 border border-slate-200/80 dark:border-white/[0.08]"
+                imgClassName="w-full h-full object-cover"
               />
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-start justify-between gap-1.5">
                   <div className="min-w-0">
-                    <div className="font-mono text-[11px] font-medium text-emerald-600 dark:text-emerald-400 tabular-nums">
-                      {selectedReport.id} · Ward {selectedReport.wardNumber} ({selectedReport.suburb})
+                    <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300 tabular-nums truncate">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: getReportPinColor(selectedReport) }}
+                      />
+                      <span>{selectedReport.id}</span>
+                      <span>·</span>
+                      <span className="truncate">Ward {selectedReport.wardNumber} ({selectedReport.suburb})</span>
                     </div>
                     <h2 className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white leading-snug line-clamp-2">
                       {selectedReport.title}
@@ -282,8 +479,8 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSelectedReport(null)}
-                    aria-label="Close pin card"
+                    onClick={() => setSelectedReportId(null)}
+                    aria-label="Close pin popup"
                     className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer shrink-0"
                   >
                     <X className="w-4 h-4" />
@@ -291,23 +488,39 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300">
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 min-w-0">
                     {selectedReport.forensics.status === 'VERIFIED' ? (
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     ) : (
-                      <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+                      <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     )}
-                    <span className="truncate">{selectedReport.status}</span>
+                    <span className="truncate font-medium">{selectedReport.status}</span>
                   </span>
-                  <span className="font-mono tabular-nums flex items-center gap-1 shrink-0">
+                  <span className="font-mono tabular-nums flex items-center gap-1 shrink-0 font-semibold">
                     <Users className="w-3 h-3" /> +{selectedReport.clusteredHouseholds}
                   </span>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <RefBadge value={selectedReport.municipalRef} />
                   <SlaCountdown report={selectedReport} />
                 </div>
+
+                {selectedVerifyState?.isRestored && selectedVerifyState.withinWindow && (
+                  <div className="flex items-center justify-between gap-2 text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-600/10 border border-emerald-600/20 rounded-lg px-2 py-1 tabular-nums">
+                    <span className="flex items-center gap-1 truncate">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      <span>
+                        {selectedVerifyState.alreadyVerifiedByUser
+                          ? `Verified (+${VERIFY_FIX_POINTS} CR)`
+                          : `Verify fix (+${VERIFY_FIX_POINTS} CR)`}
+                      </span>
+                    </span>
+                    <span className="font-mono font-semibold shrink-0">
+                      {selectedVerifyState.remainingLabel}
+                    </span>
+                  </div>
+                )}
 
                 <a
                   href={osmDirectionsUrl(selectedReport.lat, selectedReport.lng)}
@@ -317,14 +530,14 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                 >
                   <ExternalLink className="w-3 h-3" />
                   <span>
-                    {selectedReport.lat.toFixed(4)}, {selectedReport.lng.toFixed(4)} · OpenStreetMap
+                    {selectedReport.lat.toFixed(4)}, {selectedReport.lng.toFixed(4)} · Directions
                   </span>
                 </a>
               </div>
             </div>
 
             {selectedReport.forensics.status !== 'FLAGGED_SYNTHETIC' && (
-              <div className="flex items-center gap-2 px-3.5 pb-3.5">
+              <div className="flex items-center gap-2 px-3 pb-3 pt-0.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -340,26 +553,26 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                     );
                   }}
                   title="Share report to WhatsApp"
-                  className="min-h-[34px] px-2.5 rounded-lg border border-slate-200/90 dark:border-white/15 text-[11px] font-semibold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                  className="min-h-[36px] px-2.5 rounded-xl border border-slate-200/90 dark:border-white/15 text-xs font-semibold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                 >
                   <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   <span>Share</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => onCorroborate(selectedReport.id)}
-                  className="flex-1 min-h-[34px] rounded-lg border border-slate-200/90 dark:border-white/15 text-[11px] font-semibold text-slate-800 dark:text-white cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                  onClick={() => handlePinCorroborate(selectedReport.id)}
+                  className="flex-1 min-h-[36px] px-2.5 rounded-xl border border-emerald-600/35 dark:border-emerald-400/35 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform duration-150"
                 >
-                  +1 Household
+                  +1 Me Too ({selectedReport.clusteredHouseholds})
                 </button>
-                {selectedReport.status !== 'Resolved' && (
+                {selectedVerifyState?.canVerify && (
                   <button
                     type="button"
-                    onClick={() => onVerifyResolution(selectedReport.id)}
-                    className="flex-1 min-h-[34px] rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-950 text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                    onClick={() => handlePinVerify(selectedReport)}
+                    className="flex-1 min-h-[36px] px-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-950 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150 tabular-nums"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Verify Fix</span>
+                    <span>Verify Fix (+{VERIFY_FIX_POINTS} CR)</span>
                   </button>
                 )}
               </div>

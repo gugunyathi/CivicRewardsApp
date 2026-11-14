@@ -32,8 +32,15 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
           }}
         >
           <div style={{ maxWidth: 480, width: '100%' }}>
-            <div style={{ color: '#f87171', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
-              CivicRewards — Unexpected Error
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <img
+                src="/assets/logo-mark.png"
+                alt="CivicRewards"
+                style={{ width: 28, height: 28, borderRadius: 8, background: '#fff', padding: 2, objectFit: 'contain' }}
+              />
+              <div style={{ color: '#f87171', fontWeight: 700, fontSize: 14 }}>
+                CivicRewards — Unexpected Error
+              </div>
             </div>
             <div
               style={{

@@ -1,7 +1,6 @@
 /**
- * Free, keyless basemap providers (OpenStreetMap ecosystem).
- * No API token required — all tiles are free for this app's usage tier.
- * CARTO basemaps + OpenStreetMap standard + Esri World Imagery (free tile endpoint).
+ * Basemap definitions powered by Mapbox Styles API (proxied server-side via /api/mapbox/tiles/*
+ * so MAPBOX_TOKEN remains strictly on the server, with automatic OSM/CARTO fallback if unavailable).
  */
 export type BasemapId = 'streets' | 'light' | 'dark' | 'satellite';
 
@@ -15,42 +14,45 @@ export interface BasemapDef {
   maxZoom: number;
 }
 
+const MAPBOX_ATTRIBUTION =
+  '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
 export const BASEMAPS: Record<BasemapId, BasemapDef> = {
   streets: {
     id: 'streets',
-    label: 'OSM Streets',
+    label: 'Mapbox Streets',
     shortLabel: 'Streets',
-    tileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    subdomains: 'abc',
-    maxZoom: 19,
+    tileUrl: '/api/mapbox/tiles/streets/{z}/{x}/{y}',
+    attribution: MAPBOX_ATTRIBUTION,
+    subdomains: '',
+    maxZoom: 20,
   },
   light: {
     id: 'light',
-    label: 'Carto Light',
+    label: 'Mapbox Light',
     shortLabel: 'Light',
-    tileUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
+    tileUrl: '/api/mapbox/tiles/light/{z}/{x}/{y}',
+    attribution: MAPBOX_ATTRIBUTION,
+    subdomains: '',
     maxZoom: 20,
   },
   dark: {
     id: 'dark',
-    label: 'Carto Dark',
+    label: 'Mapbox Dark',
     shortLabel: 'Dark',
-    tileUrl: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
+    tileUrl: '/api/mapbox/tiles/dark/{z}/{x}/{y}',
+    attribution: MAPBOX_ATTRIBUTION,
+    subdomains: '',
     maxZoom: 20,
   },
   satellite: {
     id: 'satellite',
-    label: 'Esri Satellite',
+    label: 'Mapbox Satellite',
     shortLabel: 'Satellite',
-    tileUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+    tileUrl: '/api/mapbox/tiles/satellite/{z}/{x}/{y}',
+    attribution: MAPBOX_ATTRIBUTION,
     subdomains: '',
-    maxZoom: 19,
+    maxZoom: 20,
   },
 };
 
@@ -76,10 +78,9 @@ export function latLngToTile(lat: number, lng: number, zoom: number): { x: numbe
   return { x, y };
 }
 
-/** Static single-tile thumbnail URL (CARTO, free) for lightweight map previews. */
+/** Static single-tile thumbnail URL via our Mapbox tile proxy for ward/incident previews. */
 export function staticTileUrl(lat: number, lng: number, zoom: number, darkMode: boolean): string {
   const { x, y } = latLngToTile(lat, lng, zoom);
-  const style = darkMode ? 'dark_all' : 'rastertiles/voyager';
-  const sub = 'abcd'[Math.abs(x + y) % 4];
-  return `https://${sub}.basemaps.cartocdn.com/${style}/${zoom}/${x}/${y}.png`;
+  const style = darkMode ? 'dark' : 'streets';
+  return `/api/mapbox/tiles/${style}/${zoom}/${x}/${y}`;
 }

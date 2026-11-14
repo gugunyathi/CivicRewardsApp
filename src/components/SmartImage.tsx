@@ -76,15 +76,17 @@ export const SmartImage: React.FC<SmartImageProps> = React.memo(({
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      referrerPolicy="no-referrer"
-      loading={eager ? 'eager' : 'lazy'}
-      decoding="async"
-      onError={() => setFailed(true)}
-      className={`${imgClassName} ${className}`}
-    />
+    <div className={`relative overflow-hidden ${className}`}>
+      <img
+        src={src}
+        alt={alt}
+        referrerPolicy="no-referrer"
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+        onError={() => setFailed(true)}
+        className={imgClassName}
+      />
+    </div>
   );
 });
 

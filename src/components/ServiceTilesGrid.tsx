@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Plus } from 'lucide-react';
 import type { ServiceCategory, ServiceCategoryId, WardRecord } from '../types/civic';
+import type { CardTimeMode } from '../utils/sastTime';
 import { SERVICE_INDICATOR_META } from './ServiceCarousel';
 import { SmartImage } from './SmartImage';
 
@@ -10,6 +11,7 @@ interface ServiceTilesGridProps {
   onSelectIndex: (index: number) => void;
   onTriggerCategory: (categoryId: ServiceCategoryId) => void;
   activeWard: WardRecord;
+  cardTimeMode: CardTimeMode;
 }
 
 export const ServiceTilesGrid: React.FC<ServiceTilesGridProps> = React.memo(({
@@ -18,6 +20,7 @@ export const ServiceTilesGrid: React.FC<ServiceTilesGridProps> = React.memo(({
   onSelectIndex,
   onTriggerCategory,
   activeWard,
+  cardTimeMode,
 }) => {
   return (
     <section
@@ -47,7 +50,7 @@ export const ServiceTilesGrid: React.FC<ServiceTilesGridProps> = React.memo(({
               }`}
             >
               <SmartImage
-                src={cat.imageUrl}
+                src={cardTimeMode === 'am' ? cat.dayImageUrl : cat.imageUrl}
                 alt={cat.title}
                 categoryId={cat.id}
                 label={cat.shortTitle}
@@ -71,10 +74,10 @@ export const ServiceTilesGrid: React.FC<ServiceTilesGridProps> = React.memo(({
               {/* Bottom Title + Action Strip */}
               <div className="absolute bottom-2.5 left-2.5 right-2.5 space-y-1.5">
                 <div>
-                  <div className="font-display text-xs sm:text-sm font-bold text-white leading-tight line-clamp-1 tracking-tight">
+                  <div className="font-display text-sm sm:text-[15px] font-bold text-white leading-tight line-clamp-1 tracking-tight">
                     {cat.title}
                   </div>
-                  <div className="text-[10px] text-white/75 truncate">
+                  <div className="text-[11px] sm:text-xs font-bold text-white/90 truncate">
                     {cat.entity}
                   </div>
                 </div>

@@ -4,9 +4,11 @@ import { BurgerMenuDrawer } from './components/BurgerMenuDrawer';
 import { CivicAssistantDrawer } from './components/CivicAssistantDrawer';
 import { CommandCenterView } from './components/CommandCenterView';
 import { CouncillorDeskView } from './components/CouncillorDeskView';
-import { DirectoryView, RewardsView } from './components/DirectoryRewardsView';
+import { DirectoryView } from './components/DirectoryRewardsView';
 import { FloatingMenu } from './components/FloatingMenu';
 import { authClient, type SessionProfile } from './utils/authClient';
+import { getSastTimeOfDay, type CardTimeMode } from './utils/sastTime';
+import { VERIFY_FIX_POINTS, getVerificationWindowState } from './utils/verificationWindow';
 import { LiveMapView } from './components/LiveMapView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ReportFormModal } from './components/ReportFormModal';
@@ -30,6 +32,7 @@ import type {
   ServiceCategoryId,
   SocialPulseItem,
   UserProfile,
+  UserRole,
 } from './types/civic';
 
 const PAGE_ORDER: Array<{ id: AppView; label: string }> = [
@@ -47,6 +50,27 @@ export default function App() {
   const [activeView, setActiveView] = useState<AppView>('hub');
   const [darkMode, setDarkMode] = useState(true);
   const [emergencyMode, setEmergencyMode] = useState(false);
+  const [cardTimeMode, setCardTimeMode] = useState<CardTimeMode>(() => getSastTimeOfDay());
+  const lastSastPeriodRef = useRef<CardTimeMode>(getSastTimeOfDay());
+
+  useEffect(() => {
+    const syncWithSast = () => {
+      const currentPeriod = getSastTimeOfDay();
+      if (currentPeriod !== lastSastPeriodRef.current) {
+        lastSastPeriodRef.current = currentPeriod;
+        setCardTimeMode(currentPeriod);
+      }
+    };
+    const interval = window.setInterval(syncWithSast, 30_000);
+    window.addEventListener('visibilitychange', syncWithSast);
+    window.addEventListener('focus', syncWithSast);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('visibilitychange', syncWithSast);
+      window.removeEventListener('focus', syncWithSast);
+    };
+  }, []);
+
   const [servicesLayout, setServicesLayout] = useState<'carousel' | 'tiles'>(() => {
     try {
       const saved = localStorage.getItem('civicpulse_services_layout');
@@ -55,6 +79,29 @@ export default function App() {
       return 'carousel';
     }
   });
+
+  const [role, setRole] = useState<UserRole>(() => {
+    try {
+      const saved = localStorage.getItem('civicpulse_user_role');
+      return saved === 'councillor' ? 'councillor' : 'resident';
+    } catch {
+      return 'resident';
+    }
+  });
+
+  const handleChangeRole = useCallback((nextRole: UserRole) => {
+    setRole(nextRole);
+    try {
+      localStorage.setItem('civicpulse_user_role', nextRole);
+    } catch {
+      // ignore storage restrictions
+    }
+    setActiveView((curr) => {
+      if (nextRole === 'resident' && curr === 'desk') return 'hub';
+      return curr;
+    });
+    setToastMessage(nextRole === 'councillor' ? 'Switched to Councillor Desk view.' : 'Switched to Resident view.');
+  }, []);
 
   const handleChangeServicesLayout = useCallback((next: 'carousel' | 'tiles') => {
     setServicesLayout(next);
@@ -79,6 +126,7 @@ export default function App() {
   });
 
   const [reports, setReports] = useState<CivicReport[]>(SEED_REPORTS);
+  const [verifiedFixIds, setVerifiedFixIds] = useState<string[]>([]);
   const [socialItems, setSocialItems] = useState<SocialPulseItem[]>(SEED_SOCIAL_PULSE);
   const [transactions, setTransactions] = useState<RewardTransaction[]>(SEED_REWARD_TRANSACTIONS);
   const [monthlyBills, setMonthlyBills] = useState<MonthlyMunicipalBill[]>(SEED_USER_MONTHLY_BILLS);
@@ -169,16 +217,21 @@ export default function App() {
     [reports]
   );
 
-  const currentPageIdx = PAGE_ORDER.findIndex((p) => p.id === activeView);
+  const visiblePages = useMemo(
+    () => PAGE_ORDER.filter((p) => p.id !== 'desk' || role === 'councillor'),
+    [role]
+  );
+
+  const currentPageIdx = Math.max(0, visiblePages.findIndex((p) => p.id === activeView));
   const goToPrevPage = useCallback(() => {
-    const prevIdx = (currentPageIdx - 1 + PAGE_ORDER.length) % PAGE_ORDER.length;
-    setActiveView(PAGE_ORDER[prevIdx].id);
-  }, [currentPageIdx]);
+    const prevIdx = (currentPageIdx - 1 + visiblePages.length) % visiblePages.length;
+    setActiveView(visiblePages[prevIdx].id);
+  }, [currentPageIdx, visiblePages]);
 
   const goToNextPage = useCallback(() => {
-    const nextIdx = (currentPageIdx + 1) % PAGE_ORDER.length;
-    setActiveView(PAGE_ORDER[nextIdx].id);
-  }, [currentPageIdx]);
+    const nextIdx = (currentPageIdx + 1) % visiblePages.length;
+    setActiveView(visiblePages[nextIdx].id);
+  }, [currentPageIdx, visiblePages]);
 
   const pushReward = useCallback(
     (title: string, subtitle: string, points: number, type: 'earn' | 'redeem' = 'earn') => {
@@ -229,8 +282,8 @@ export default function App() {
   );
 
   const handleCorroborateReport = useCallback(
-    (reportId: string) => {
-      if (!requireAuth('link your household')) return;
+    (reportId: string): boolean => {
+      if (!requireAuth('link your household')) return false;
       setReports((prev) =>
         prev.map((r) =>
           r.id === reportId
@@ -244,44 +297,80 @@ export default function App() {
       );
       pushReward('Neighbor Outage Corroboration', `Linked household to ${reportId}`, 15);
       setToastMessage(`Linked your household to ${reportId} (+15 Civic Credits)`);
+      return true;
     },
     [requireAuth, pushReward]
   );
 
   const handleVerifyResolution = useCallback(
-    (reportId: string) => {
-      if (!requireAuth('verify a resolution')) return;
+    (reportId: string, reportSnapshot?: CivicReport): boolean => {
+      if (!requireAuth('verify a restored service')) return false;
+      if (verifiedFixIds.includes(reportId)) {
+        setToastMessage(`You already verified the fix on ${reportId}.`);
+        return false;
+      }
+
+      const target = reports.find((r) => r.id === reportId) ?? reportSnapshot;
+      if (target) {
+        const win = getVerificationWindowState(target, verifiedFixIds);
+        if (!win.canVerify) {
+          if (win.windowExpired) {
+            setToastMessage('The 15-minute Verify Fix window has closed for this restored service.');
+          }
+          return false;
+        }
+      }
+
+      const nowIso = new Date().toISOString();
+      setVerifiedFixIds((prev) => (prev.includes(reportId) ? prev : [...prev, reportId]));
       setReports((prev) =>
         prev.map((r) =>
           r.id === reportId
             ? {
                 ...r,
                 status: 'Resolved',
+                resolvedAtIso: r.resolvedAtIso ?? nowIso,
                 verifiedByResidents: r.verifiedByResidents + 1,
-                escalationLog: [...r.escalationLog, 'Resident confirmed physical repair completed'],
+                escalationLog: [...r.escalationLog, 'Resident confirmed service restored within verify window'],
               }
             : r
         )
       );
-      pushReward('Verify Resolution Confirmation', `Confirmed street repair on ${reportId}`, 30);
-      setToastMessage(`Resolution verified for ${reportId} (+30 Civic Credits)`);
+      pushReward(
+        'Verify Fix Confirmation',
+        `Confirmed service restoration on ${reportId}`,
+        VERIFY_FIX_POINTS
+      );
+      setToastMessage(`Fix verified on ${reportId} (+${VERIFY_FIX_POINTS} Civic Credits)`);
+      return true;
     },
-    [requireAuth, pushReward]
+    [requireAuth, verifiedFixIds, reports, pushReward]
   );
 
   const handleUpdateStatus = useCallback((reportId: string, newStatus: ReportStatus) => {
+    const nowIso = new Date().toISOString();
     setReports((prev) =>
       prev.map((r) =>
         r.id === reportId
           ? {
               ...r,
               status: newStatus,
+              resolvedAtIso:
+                newStatus === 'Resolved'
+                  ? r.status === 'Resolved' && r.resolvedAtIso
+                    ? r.resolvedAtIso
+                    : nowIso
+                  : null,
               escalationLog: [...r.escalationLog, `Status updated to "${newStatus}" by Councillor/Depot Desk`],
             }
           : r
       )
     );
-    setToastMessage(`${reportId} updated to ${newStatus}`);
+    setToastMessage(
+      newStatus === 'Resolved'
+        ? `${reportId} marked restored — 15m resident Verify Fix window opened`
+        : `${reportId} updated to ${newStatus}`
+    );
   }, []);
 
   const handleAttachRef = useCallback((reportId: string, refCode: string) => {
@@ -386,10 +475,27 @@ export default function App() {
     setReportCategory(catId);
     setReportModalOpen(true);
   }, []);
-  const openFeed = useCallback(() => setActiveView('feed'), []);
   const openMap = useCallback(() => setActiveView('map'), []);
-  const openRewards = useCallback(() => setActiveView('rewards'), []);
   const openProfile = useCallback(() => setActiveView('profile'), []);
+
+  const handleRedeemOffer = useCallback(
+    (_offerId: string, cost: number, title: string): boolean => {
+      if (!requireAuth('redeem rewards')) return false;
+      if (user.credits < cost) {
+        setToastMessage('Not enough Civic Credits for this reward.');
+        return false;
+      }
+      pushReward(
+        'Cashed Out · ' + title,
+        `Redeemed by ${user.mobileZa || user.emailOrHandle || user.name}`,
+        cost,
+        'redeem'
+      );
+      setToastMessage(`Redeemed ${title} (-${cost} CR)`);
+      return true;
+    },
+    [requireAuth, user.credits, user.mobileZa, user.emailOrHandle, user.name, pushReward]
+  );
 
   return (
     <div className="min-h-dvh bg-[#F8FAFC] dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 transition-colors duration-150 flex flex-col">
@@ -398,6 +504,8 @@ export default function App() {
         onSelectView={setActiveView}
         activeWard={activeWard}
         user={user}
+        role={role}
+        onChangeRole={handleChangeRole}
         activeTicketCount={activeTicketCount}
         emergencyMode={emergencyMode}
         onToggleEmergency={toggleEmergency}
@@ -405,6 +513,7 @@ export default function App() {
         onToggleDarkMode={toggleDarkMode}
         onOpenAuthModal={openAuthModal}
         onOpenBurgerMenu={openBurgerMenu}
+        onOpenAssistant={openAssistant}
       />
 
       {/* Swipeable Paged Viewport */}
@@ -440,15 +549,14 @@ export default function App() {
             <CommandCenterView
               activeWard={activeWard}
               user={user}
-              reportCount={reports.length}
               emergencyMode={emergencyMode}
               onToggleEmergency={toggleEmergency}
               onOpenReportModal={openCategoryReportModal}
               onOpenAuthModal={openAuthModal}
-              onOpenFeed={openFeed}
-              onOpenMap={openMap}
               servicesLayout={servicesLayout}
               onChangeServicesLayout={handleChangeServicesLayout}
+              cardTimeMode={cardTimeMode}
+              onChangeCardTimeMode={setCardTimeMode}
             />
           )}
 
@@ -456,6 +564,7 @@ export default function App() {
             <WardFeedView
               reports={reports}
               activeWard={activeWard}
+              verifiedFixIds={verifiedFixIds}
               onCorroborateReport={handleCorroborateReport}
               onVerifyResolution={handleVerifyResolution}
               onOpenReportModal={openDefaultReportModal}
@@ -468,6 +577,7 @@ export default function App() {
               reports={reports}
               activeWard={activeWard}
               darkMode={darkMode}
+              verifiedFixIds={verifiedFixIds}
               onSelectWard={(wardId) => handleSelectWard(wardId, false)}
               onCorroborate={handleCorroborateReport}
               onVerifyResolution={handleVerifyResolution}
@@ -503,24 +613,14 @@ export default function App() {
             />
           )}
 
-          {activeView === 'rewards' && (
-            <RewardsView
-              user={user}
-              transactions={transactions}
-              onRedeemOffer={(_offerId, cost, title) => {
-                if (!requireAuth('redeem rewards')) return;
-                pushReward('Cashed Out · ' + title, `Redeemed by ${user.mobileZa}`, cost, 'redeem');
-              }}
-            />
-          )}
-
-          {activeView === 'profile' && (
+          {(activeView === 'profile' || activeView === 'rewards') && (
             <UserProfileView
               user={user}
               activeWard={activeWard}
               reports={reports}
               transactions={transactions}
               monthlyBills={monthlyBills}
+              initialTab={activeView === 'rewards' ? 'points' : undefined}
               onUpdateCurrentBill={(updated) => {
                 setMonthlyBills((prev) =>
                   prev.map((b) => (b.monthKey === updated.monthKey ? updated : b))
@@ -529,7 +629,7 @@ export default function App() {
               }}
               onOpenAuthModal={openAuthModal}
               onOpenReportModal={openDefaultReportModal}
-              onOpenRewards={openRewards}
+              onRedeemOffer={handleRedeemOffer}
               onVerifyResolution={handleVerifyResolution}
               onAttachRef={handleAttachRef}
               onSendSlaReminder={handleSendSlaReminder}
@@ -540,6 +640,7 @@ export default function App() {
 
       <MobileBottomNav
         activeView={activeView}
+        role={role}
         onSelectView={setActiveView}
       />
 
@@ -560,6 +661,8 @@ export default function App() {
         onSelectView={setActiveView}
         activeWard={activeWard}
         user={user}
+        role={role}
+        onChangeRole={handleChangeRole}
         darkMode={darkMode}
         onToggleDarkMode={toggleDarkMode}
         emergencyMode={emergencyMode}

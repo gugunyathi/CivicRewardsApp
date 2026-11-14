@@ -37,7 +37,11 @@ async function createServer() {
   registerAuthRoutes(app);
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, hasGeminiKey: Boolean(process.env.GEMINI_API_KEY) });
+    res.json({
+      ok: true,
+      hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+      hasMapboxToken: Boolean(process.env.MAPBOX_TOKEN),
+    });
   });
 
   app.post('/api/forensics/analyze', async (req, res) => {
@@ -280,6 +284,305 @@ Instructions:
       const message = error instanceof Error ? error.message : 'Social summarizer failed.';
       console.error('Social API error:', message);
       res.status(500).json({ error: message });
+    }
+  });
+
+  type Ward115MapCache = {
+    fetchedAt: number;
+    payload: {
+      ok: boolean;
+      source: string;
+      totalReports: number;
+      pinnedTotal: number;
+      unmappedCount: number;
+      pins: unknown[];
+    };
+  };
+  let ward115Cache: Ward115MapCache | null = null;
+  let ward115InFlight: Promise<Ward115MapCache['payload']> | null = null;
+
+  const CATEGORY_MAP: Record<string, { id: string; dept: string; depot: string; sla: number }> = {
+    water: { id: 'water', dept: 'Water & Sanitation', depot: 'Joburg Water Randburg Depot', sla: 24 },
+    electricity: { id: 'electricity', dept: 'Electricity & Power', depot: 'City Power Bryanston Depot', sla: 24 },
+    city_power: { id: 'electricity', dept: 'Electricity & Power', depot: 'City Power Bryanston Depot', sla: 24 },
+    eskom: { id: 'electricity', dept: 'Electricity & Power', depot: 'Eskom Gauteng North', sla: 24 },
+    roads: { id: 'roads', dept: 'Roads & Stormwater', depot: 'JRA Region A Depot', sla: 72 },
+    refuse: { id: 'waste', dept: 'Waste & Dumping', depot: 'Pikitup Randburg Depot', sla: 48 },
+    safety: { id: 'safety', dept: 'Metro Police & Safety', depot: 'JMPD Region A', sla: 4 },
+    parks: { id: 'parks', dept: 'Parks & Trees', depot: 'City Parks Region A', sla: 48 },
+    billing: { id: 'accounts', dept: 'Municipal Billing', depot: 'CoJ Revenue Region A', sla: 72 },
+  };
+
+  function mapSignalDeskStatus(rawStatus?: string | null): 'Logged' | 'Escalated to Depot' | 'Resolved' {
+    const s = (rawStatus ?? 'new').toLowerCase();
+    if (s === 'resolved' || s === 'closed' || s === 'ignored') return 'Resolved';
+    if (s === 'allocated' || s === 'escalated' || s === 'in_progress') return 'Escalated to Depot';
+    return 'Logged';
+  }
+
+  function formatRelativeAgo(iso?: string | null): string {
+    if (!iso) return 'Recently';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return 'Recently';
+    const mins = Math.floor(ms / 60000);
+    if (mins < 60) return `${Math.max(1, mins)}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
+  async function loadWard115FromSignalDesk(): Promise<Ward115MapCache['payload']> {
+    const allRows: Array<Record<string, unknown>> = [];
+    let reportedTotal = 0;
+
+    for (let offset = 0; offset < 5000; offset += 1000) {
+      const url = `https://signal-desk-municipal-councillor.vercel.app/api/ward-data?ward=115&offset=${offset}&limit=1000`;
+      const upstream = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      if (!upstream.ok) break;
+      const json = (await upstream.json()) as {
+        ok?: boolean;
+        total?: number;
+        reports?: Array<Record<string, unknown>>;
+      };
+      if (!json.ok || !Array.isArray(json.reports) || json.reports.length === 0) break;
+      if (typeof json.total === 'number') reportedTotal = json.total;
+      allRows.push(...json.reports);
+      if (json.reports.length < 1000 || (reportedTotal > 0 && allRows.length >= reportedTotal)) break;
+    }
+
+    const activeRows = allRows.filter((r) => !r.dismissed_at);
+    const geocoded = activeRows.filter(
+      (r) =>
+        r.geocode_status === 'ok' &&
+        typeof r.lat === 'number' &&
+        typeof r.lng === 'number' &&
+        Number.isFinite(r.lat) &&
+        Number.isFinite(r.lng)
+    );
+    const unmappedCount = Math.max(0, (reportedTotal || activeRows.length) - geocoded.length);
+
+    const pendingOrEscalated = geocoded.filter((r) => mapSignalDeskStatus(String(r.status ?? '')) !== 'Resolved');
+    const resolvedWithMedia = geocoded.filter(
+      (r) =>
+        mapSignalDeskStatus(String(r.status ?? '')) === 'Resolved' &&
+        Array.isArray(r.ward_report_media) &&
+        r.ward_report_media.length > 0
+    );
+    const resolvedPlain = geocoded.filter(
+      (r) =>
+        mapSignalDeskStatus(String(r.status ?? '')) === 'Resolved' &&
+        (!Array.isArray(r.ward_report_media) || r.ward_report_media.length === 0)
+    );
+
+    const selectedRows = [
+      ...pendingOrEscalated,
+      ...resolvedWithMedia.slice(0, 65),
+      ...resolvedPlain.slice(0, 65),
+    ];
+
+    // Spread exact duplicate centroid coordinates slightly so every pin is tappable
+    const seenCoords = new Map<string, number>();
+    const pins = selectedRows.map((row) => {
+      const baseLat = Number(row.lat);
+      const baseLng = Number(row.lng);
+      const key = `${baseLat.toFixed(4)},${baseLng.toFixed(4)}`;
+      const dupIndex = seenCoords.get(key) ?? 0;
+      seenCoords.set(key, dupIndex + 1);
+      const angle = dupIndex * 2.39996;
+      const radius = dupIndex === 0 ? 0 : Math.min(0.0022, 0.00028 * Math.sqrt(dupIndex));
+      const lat = Number((baseLat + Math.cos(angle) * radius).toFixed(6));
+      const lng = Number((baseLng + Math.sin(angle) * radius).toFixed(6));
+
+      const rawCat = String(row.category ?? 'other').toLowerCase();
+      const catMeta = CATEGORY_MAP[rawCat] ?? {
+        id: 'roads',
+        dept: 'Ward 115 Municipal Services',
+        depot: 'Ward 115 Depot Desk',
+        sla: 48,
+      };
+      const status = mapSignalDeskStatus(String(row.status ?? 'new'));
+      const mediaArr = Array.isArray(row.ward_report_media)
+        ? (row.ward_report_media as Array<{ storage_path?: string; ai_description?: string }>)
+        : [];
+      const firstMedia = mediaArr[0];
+      const photoUrl = firstMedia?.storage_path
+        ? `https://egzzgezgpwxgwmuipvmf.supabase.co/storage/v1/object/public/ward-media/${firstMedia.storage_path}`
+        : undefined;
+      const createdAtIso = String(row.created_at ?? new Date().toISOString());
+      const resolvedAtIso =
+        status === 'Resolved'
+          ? String(row.resolved_at ?? row.updated_at ?? createdAtIso)
+          : null;
+      const desc = String(row.description ?? 'Ward 115 municipal service report').trim();
+      const loc = String(row.location ?? 'Fourways / Ward 115').trim();
+      const refNum = row.reference_number ? String(row.reference_number) : null;
+      const sevRaw = String(row.severity ?? 'medium').toLowerCase();
+      const severity =
+        sevRaw === 'critical' ? 'CRITICAL' : sevRaw === 'high' ? 'HIGH' : sevRaw === 'low' ? 'LOW' : 'MODERATE';
+
+      return {
+        id: refNum || `W115-${String(row.id ?? '').slice(0, 8)}`,
+        wardId: 'CoJ-115',
+        municipalityCode: 'CoJ',
+        wardNumber: 115,
+        suburb: loc || 'Fourways',
+        categoryId: catMeta.id,
+        departmentLabel: catMeta.dept,
+        title: desc.length > 72 ? `${desc.slice(0, 69)}…` : desc,
+        description: firstMedia?.ai_description || desc,
+        address: loc,
+        lat,
+        lng,
+        municipalRef: refNum,
+        status,
+        severity,
+        isEmergency: severity === 'CRITICAL',
+        clusteredHouseholds: status === 'Resolved' ? 4 : 7,
+        createdAtIso,
+        resolvedAtIso,
+        timeAgoLabel: formatRelativeAgo(createdAtIso),
+        slaDeadlineHours: catMeta.sla,
+        slaElapsedHours: status === 'Resolved' ? Math.min(catMeta.sla, 12) : 3,
+        assignedDepot: String(row.allocated_to ?? catMeta.depot),
+        reporterName: String(row.source_username ?? 'Ward 115 Resident'),
+        photoUrl,
+        forensics: {
+          status: photoUrl ? 'VERIFIED' : 'WARNING_STRIPPED_METADATA',
+          summaryLabel: 'Synced from Ward 115 Signal Desk',
+          timestampLabel: formatRelativeAgo(createdAtIso),
+          gpsMatchLabel: `Geocoded (${loc})`,
+          deviceLabel: 'Signal Desk Ward 115',
+          aiSyntheticScorePct: 0.02,
+          notes: firstMedia?.ai_description ?? 'Live Ward 115 dashboard incident record.',
+        },
+        escalationLog: [
+          `Synced from Ward 115 Signal Desk (${loc})`,
+          status === 'Resolved' ? 'Marked resolved on Ward 115 dashboard' : `Routed to ${catMeta.depot}`,
+        ],
+        verifiedByResidents: status === 'Resolved' ? 3 : 1,
+      };
+    });
+
+    return {
+      ok: true,
+      source: 'signal-desk-ward-115',
+      totalReports: reportedTotal || activeRows.length,
+      pinnedTotal: geocoded.length,
+      unmappedCount,
+      pins,
+    };
+  }
+
+  app.get('/api/ward115/map', async (_req, res) => {
+    try {
+      if (ward115Cache && Date.now() - ward115Cache.fetchedAt < 90_000) {
+        res.json(ward115Cache.payload);
+        return;
+      }
+      if (!ward115InFlight) {
+        ward115InFlight = loadWard115FromSignalDesk().finally(() => {
+          ward115InFlight = null;
+        });
+      }
+      const payload = await ward115InFlight;
+      ward115Cache = { fetchedAt: Date.now(), payload };
+      res.json(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load Ward 115 map pins.';
+      console.warn('Ward 115 Signal Desk proxy fallback:', message);
+      res.json({
+        ok: false,
+        source: 'local-fallback',
+        totalReports: 0,
+        pinnedTotal: 0,
+        unmappedCount: 0,
+        pins: [],
+      });
+    }
+  });
+
+  // Server-side Mapbox tile proxy so MAPBOX_TOKEN stays private on the server
+  const MAPBOX_STYLE_MAP: Record<string, { mapboxId: string; fallbackUrl: (z: number, x: number, y: number) => string }> = {
+    streets: {
+      mapboxId: 'mapbox/streets-v12',
+      fallbackUrl: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+    },
+    light: {
+      mapboxId: 'mapbox/light-v11',
+      fallbackUrl: (z, x, y) => `https://a.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`,
+    },
+    dark: {
+      mapboxId: 'mapbox/dark-v11',
+      fallbackUrl: (z, x, y) => `https://a.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`,
+    },
+    satellite: {
+      mapboxId: 'mapbox/satellite-streets-v12',
+      fallbackUrl: (z, x, y) =>
+        `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
+    },
+  };
+
+  app.get('/api/mapbox/tiles/:style/:z/:x/:y', async (req, res) => {
+    const styleKey = String(req.params.style || '').toLowerCase();
+    const styleCfg = MAPBOX_STYLE_MAP[styleKey];
+    const z = Number.parseInt(req.params.z, 10);
+    const x = Number.parseInt(req.params.x, 10);
+    const y = Number.parseInt(req.params.y, 10);
+
+    if (
+      !styleCfg ||
+      !Number.isInteger(z) ||
+      !Number.isInteger(x) ||
+      !Number.isInteger(y) ||
+      z < 0 ||
+      z > 22 ||
+      x < 0 ||
+      y < 0
+    ) {
+      res.status(400).json({ error: 'Invalid tile parameters.' });
+      return;
+    }
+
+    const token = process.env.MAPBOX_TOKEN?.trim();
+    const targetUrl = token
+      ? `https://api.mapbox.com/styles/v1/${styleCfg.mapboxId}/tiles/256/${z}/${x}/${y}@2x?access_token=${encodeURIComponent(token)}`
+      : styleCfg.fallbackUrl(z, x, y);
+
+    const fetchTile = async (url: string) => {
+      const r = await fetch(url, {
+        headers: { 'User-Agent': 'CivicRewards/1.0' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) {
+        throw new Error(`Tile HTTP ${r.status}`);
+      }
+      const contentType = r.headers.get('content-type') || 'image/png';
+      const buf = Buffer.from(await r.arrayBuffer());
+      return { contentType, buf };
+    };
+
+    try {
+      const tile = await fetchTile(targetUrl);
+      res.setHeader('Content-Type', tile.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('X-Map-Provider', token ? 'mapbox' : 'osm-fallback');
+      res.send(tile.buf);
+    } catch (primaryErr) {
+      if (token) {
+        try {
+          const fallback = await fetchTile(styleCfg.fallbackUrl(z, x, y));
+          res.setHeader('Content-Type', fallback.contentType);
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          res.setHeader('X-Map-Provider', 'osm-fallback');
+          res.send(fallback.buf);
+          return;
+        } catch {
+          // ignore secondary failure
+        }
+      }
+      const msg = primaryErr instanceof Error ? primaryErr.message : 'Tile fetch failed';
+      res.status(502).json({ error: msg });
     }
   });
 

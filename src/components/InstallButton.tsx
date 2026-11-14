@@ -106,12 +106,15 @@ export const InstallButton: React.FC<{ className?: string }> = ({ className = ''
           <div className="w-full max-w-md flex flex-col bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/10 rounded-t-2xl sm:rounded-2xl shadow-xl shadow-slate-900/15 overflow-hidden ui-modal-enter overscroll-contain">
             <div className="px-6 py-4 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <PlatformIcon platform={platform} />
-                </span>
+                <img
+                  src="/assets/logo-mark.png"
+                  alt="CivicRewards logo"
+                  className="w-9 h-9 rounded-xl bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+                />
                 <div className="min-w-0">
-                  <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                    Offline-ready app
+                  <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                    <PlatformIcon platform={platform} className="w-3 h-3" />
+                    <span>Offline-ready app</span>
                   </div>
                   <h2 className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white truncate">
                     {guide.title}

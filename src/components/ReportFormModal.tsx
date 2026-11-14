@@ -772,7 +772,12 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
         {/* Clean Step Counter Header */}
         <div className="shrink-0 px-5 sm:px-6 pt-4 pb-3 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2.5 min-w-0 text-xs text-slate-500 dark:text-slate-400">
+            <img
+              src="/assets/logo-mark.png"
+              alt="CivicRewards logo"
+              className="w-7 h-7 rounded-lg bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+            />
             <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums whitespace-nowrap">
               Step {step} of {TOTAL_STEPS}
             </span>

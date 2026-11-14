@@ -269,15 +269,22 @@ export const AuthOnboardingModal: React.FC<AuthOnboardingModalProps> = ({
         {/* Pinned Header + 3-Step Track */}
         <div className="shrink-0 px-5 sm:px-6 pt-4 pb-3 border-b border-slate-200/80 dark:border-white/[0.08] space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider tabular-nums">
-                Step {step} of 3 · Ward & Account
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img
+                src="/assets/logo-mark.png"
+                alt="CivicRewards logo"
+                className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+              />
+              <div className="min-w-0">
+                <div className="font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider tabular-nums">
+                  Step {step} of 3 · Ward & Account
+                </div>
+                <h2 id="auth-modal-title" className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
+                  {step === 1 && 'Select your municipal ward'}
+                  {step === 2 && 'Verify & sign in'}
+                  {step === 3 && 'Ward & profile summary'}
+                </h2>
               </div>
-              <h2 id="auth-modal-title" className="font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
-                {step === 1 && 'Select your municipal ward'}
-                {step === 2 && 'Verify & sign in'}
-                {step === 3 && 'Ward & profile summary'}
-              </h2>
             </div>
 
             <button

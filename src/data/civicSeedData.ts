@@ -23,6 +23,16 @@ import imgSubstation from '../assets/images/evidence_substation_trip_17945651494
 import imgTrafficSignal from '../assets/images/evidence_traffic_signal_1794565149264.jpg';
 import imgWaste from '../assets/images/cat_waste_1794569476302.jpg';
 import imgWater from '../assets/images/cat_water_1794569471977.jpg';
+import imgDayAccounts from '../assets/images/day_accounts_1794687553284.jpg';
+import imgDayAnticorruption from '../assets/images/day_anticorruption_1794687553310.jpg';
+import imgDayElectricity from '../assets/images/day_electricity_1794687550673.jpg';
+import imgDayNotices from '../assets/images/day_notices_1794687554737.jpg';
+import imgDayParks from '../assets/images/day_parks_1794687552194.jpg';
+import imgDayRoads from '../assets/images/day_roads_1794687551530.jpg';
+import imgDaySafety from '../assets/images/day_safety_1794687553838.jpg';
+import imgDayStreetlights from '../assets/images/day_streetlights_1794687551861.jpg';
+import imgDayWaste from '../assets/images/day_waste_1794687552008.jpg';
+import imgDayWater from '../assets/images/day_water_1794687550175.jpg';
 
 export const MUNICIPALITIES: Record<
   MunicipalityCode,
@@ -385,6 +395,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'JWAPP-40128554',
     slaHours: 24,
     imageUrl: imgWater,
+    dayImageUrl: imgDayWater,
   },
   {
     id: 'electricity',
@@ -395,6 +406,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'CPWEB5012172',
     slaHours: 24,
     imageUrl: imgElectricity,
+    dayImageUrl: imgDayElectricity,
   },
   {
     id: 'roads',
@@ -405,6 +417,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'JRA-2026-9182',
     slaHours: 72,
     imageUrl: imgRoads,
+    dayImageUrl: imgDayRoads,
   },
   {
     id: 'streetlights',
@@ -415,6 +428,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'TSH-882910',
     slaHours: 24,
     imageUrl: imgStreetlights,
+    dayImageUrl: imgDayStreetlights,
   },
   {
     id: 'waste',
@@ -425,6 +439,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'PKT-334912',
     slaHours: 48,
     imageUrl: imgWaste,
+    dayImageUrl: imgDayWaste,
   },
   {
     id: 'parks',
@@ -435,6 +450,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'JCP-194022',
     slaHours: 48,
     imageUrl: imgParks,
+    dayImageUrl: imgDayParks,
   },
   {
     id: 'safety',
@@ -445,6 +461,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'JMPD-77401',
     slaHours: 4,
     imageUrl: imgSafety,
+    dayImageUrl: imgDaySafety,
   },
   {
     id: 'accounts',
@@ -455,6 +472,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'ACC-900412881',
     slaHours: 72,
     imageUrl: imgAccounts,
+    dayImageUrl: imgDayAccounts,
     isInfoModule: true,
   },
   {
@@ -466,6 +484,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'GFIS-ANON',
     slaHours: 12,
     imageUrl: imgAnticorruption,
+    dayImageUrl: imgDayAnticorruption,
     isInfoModule: true,
   },
   {
@@ -477,11 +496,55 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     refHint: 'NOTICE-2026',
     slaHours: 0,
     imageUrl: imgNotices,
+    dayImageUrl: imgDayNotices,
     isInfoModule: true,
   },
 ];
 
 export const SEED_REPORTS: CivicReport[] = [
+  {
+    id: 'CP-2026-1048',
+    wardId: 'CoJ-115',
+    municipalityCode: 'CoJ',
+    wardNumber: 115,
+    suburb: 'Fourways',
+    categoryId: 'water',
+    departmentLabel: 'Water & Sanitation',
+    title: 'Restored Water Supply at Fourways Gardens & Uranium Rd',
+    description:
+      'Johannesburg Water repair team completed 110mm isolation valve replacement and reopened supply. Verify water pressure is restored at your tap within 15 minutes of restoration.',
+    address: 'Uranium Rd & Bushwillow Ave, Fourways',
+    lat: -26.0119,
+    lng: 27.9971,
+    municipalRef: 'JWAPP-40131902',
+    status: 'Resolved',
+    severity: 'HIGH',
+    isEmergency: false,
+    clusteredHouseholds: 19,
+    createdAtIso: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+    resolvedAtIso: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+    timeAgoLabel: 'Restored 3 mins ago',
+    slaDeadlineHours: 24,
+    slaElapsedHours: 2,
+    assignedDepot: 'Joburg Water Randburg Depot',
+    reporterName: 'Thabo M.',
+    photoUrl: imgPipeBurst,
+    forensics: {
+      status: 'VERIFIED',
+      summaryLabel: 'Service Restored · 15m Verify Window Open',
+      timestampLabel: 'Restored 3 mins ago',
+      gpsMatchLabel: 'GPS Match: 7m from pin',
+      deviceLabel: 'Samsung Galaxy S24',
+      aiSyntheticScorePct: 0.01,
+      notes: 'Joburg Water crew marked repair complete 3 minutes ago; resident verification open for 15 minutes.',
+    },
+    escalationLog: [
+      'Logged with JWAPP-40131902 reference',
+      'Joburg Water Randburg Depot completed valve repair',
+      'Service restored 3 mins ago — 15-minute resident Verify Fix window active',
+    ],
+    verifiedByResidents: 2,
+  },
   {
     id: 'CP-2026-1041',
     wardId: 'CoJ-115',
@@ -672,6 +735,7 @@ export const SEED_REPORTS: CivicReport[] = [
     isEmergency: false,
     clusteredHouseholds: 11,
     createdAtIso: new Date(Date.now() - 1000 * 60 * 60 * 52).toISOString(),
+    resolvedAtIso: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
     timeAgoLabel: '2 days ago',
     slaDeadlineHours: 72,
     slaElapsedHours: 38,
@@ -714,6 +778,7 @@ export const SEED_REPORTS: CivicReport[] = [
     isEmergency: false,
     clusteredHouseholds: 8,
     createdAtIso: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
+    resolvedAtIso: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
     timeAgoLabel: '6 days ago',
     slaDeadlineHours: 24,
     slaElapsedHours: 19,
@@ -735,6 +800,129 @@ export const SEED_REPORTS: CivicReport[] = [
       'Confirmed lit by resident inspection',
     ],
     verifiedByResidents: 4,
+  },
+  {
+    id: 'CP-2026-1045',
+    wardId: 'CoJ-115',
+    municipalityCode: 'CoJ',
+    wardNumber: 115,
+    suburb: 'Fourways',
+    categoryId: 'electricity',
+    departmentLabel: 'Electricity & Power',
+    title: 'Low-Voltage Feeder Fault near Witkoppen & William Nicol',
+    description:
+      'Intermittent brownouts and traffic signal flicker affecting Montecasino Boulevard and Fourways Crossing feeder.',
+    address: 'Witkoppen Rd & William Nicol Dr, Fourways',
+    lat: -26.0268,
+    lng: 28.0145,
+    municipalRef: 'CPWEB5013904',
+    status: 'Logged',
+    severity: 'CRITICAL',
+    isEmergency: false,
+    clusteredHouseholds: 27,
+    createdAtIso: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+    timeAgoLabel: '35 mins ago',
+    slaDeadlineHours: 24,
+    slaElapsedHours: 1,
+    assignedDepot: 'City Power Bryanston Depot',
+    reporterName: 'Sipho Ndlovu',
+    photoUrl: imgSubstation,
+    forensics: {
+      status: 'VERIFIED',
+      summaryLabel: 'Verified Live Capture (GPS + Timestamp Match)',
+      timestampLabel: 'EXIF Timestamp: 28 mins ago',
+      gpsMatchLabel: 'GPS Match: 11m from pin',
+      deviceLabel: 'iPhone 15 Pro',
+      aiSyntheticScorePct: 0.01,
+      notes: 'Authentic field photo of feeder pillar cabinet; queued for City Power dispatch.',
+    },
+    escalationLog: [
+      'Logged with GPS & EXIF forensic seal (CPWEB5013904)',
+      '27 households linked along Witkoppen corridor',
+    ],
+    verifiedByResidents: 6,
+  },
+  {
+    id: 'CP-2026-1046',
+    wardId: 'CoJ-115',
+    municipalityCode: 'CoJ',
+    wardNumber: 115,
+    suburb: 'Douglasdale',
+    categoryId: 'waste',
+    departmentLabel: 'Waste & Dumping',
+    title: 'Overflowing Skip & Rubble Dumping at Douglas Drive',
+    description:
+      'Builders rubble and garden refuse dumped beside municipal stormwater culvert on Douglas Drive.',
+    address: 'Douglas Dr & Galloway Ave, Douglasdale',
+    lat: -26.0362,
+    lng: 27.9974,
+    municipalRef: 'PKT-335801',
+    status: 'Escalated to Depot',
+    severity: 'MODERATE',
+    isEmergency: false,
+    clusteredHouseholds: 9,
+    createdAtIso: new Date(Date.now() - 1000 * 60 * 60 * 7).toISOString(),
+    timeAgoLabel: '7h ago',
+    slaDeadlineHours: 48,
+    slaElapsedHours: 7,
+    assignedDepot: 'Pikitup Randburg Depot',
+    reporterName: 'Claire B.',
+    photoUrl: imgWaste,
+    forensics: {
+      status: 'VERIFIED',
+      summaryLabel: 'Verified Live Capture (GPS + Timestamp Match)',
+      timestampLabel: 'EXIF Timestamp: 7 hours ago',
+      gpsMatchLabel: 'GPS Match: 6m from pin',
+      deviceLabel: 'Google Pixel 9',
+      aiSyntheticScorePct: 0.03,
+      notes: 'Original field capture verified; Pikitup grab-truck scheduled.',
+    },
+    escalationLog: [
+      'Logged to Ward 115 Live Map',
+      'Escalated to Pikitup Randburg Depot (PKT-335801)',
+    ],
+    verifiedByResidents: 3,
+  },
+  {
+    id: 'CP-2026-1047',
+    wardId: 'CoJ-115',
+    municipalityCode: 'CoJ',
+    wardNumber: 115,
+    suburb: 'Bloubosrand',
+    categoryId: 'streetlights',
+    departmentLabel: 'Streetlights & Traffic Signals',
+    title: 'Four-Way Signal Out at Witkoppen & Roos Street',
+    description:
+      'All intersection signals dark during afternoon peak following cable tamper alert.',
+    address: 'Witkoppen Rd & Roos St, Bloubosrand',
+    lat: -26.0294,
+    lng: 27.9869,
+    municipalRef: null,
+    status: 'Logged',
+    severity: 'HIGH',
+    isEmergency: false,
+    clusteredHouseholds: 14,
+    createdAtIso: new Date(Date.now() - 1000 * 60 * 22).toISOString(),
+    timeAgoLabel: '22 mins ago',
+    slaDeadlineHours: 24,
+    slaElapsedHours: 0,
+    assignedDepot: 'JRA Region A Depot',
+    reporterName: 'Nomsa D.',
+    photoUrl: imgTrafficSignal,
+    forensics: {
+      status: 'VERIFIED',
+      summaryLabel: 'Verified Live Capture (GPS + Timestamp Match)',
+      timestampLabel: 'EXIF Timestamp: 18 mins ago',
+      gpsMatchLabel: 'GPS Match: 15m from pin',
+      deviceLabel: 'Samsung Galaxy A55',
+      aiSyntheticScorePct: 0.02,
+      notes: 'Field photo verified authentic at Witkoppen & Roos junction.',
+    },
+    escalationLog: [
+      'Logged by Ward 115 resident with GPS pin',
+      'Awaiting JRA & JMPD points-duty allocation',
+    ],
+    verifiedByResidents: 5,
   },
 ];
 

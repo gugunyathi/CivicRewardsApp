@@ -3,7 +3,6 @@ import {
   Camera,
   CheckCircle2,
   Loader2,
-  MessageSquare,
   Send,
   Users,
   X,
@@ -238,15 +237,21 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
     >
       <div className="w-full max-w-md h-full bg-white dark:bg-[#111827] border-l border-slate-200/80 dark:border-white/[0.08] flex flex-col shadow-2xl ui-drawer-right overscroll-contain">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between">
-          <div>
-            <h2 className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Ward Triage Assistant</span>
-            </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Ward {activeWard.wardNumber} · Depots, Bylaws & Faults
-            </p>
+        <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img
+              src="/assets/logo-mark.png"
+              alt="CivicRewards logo"
+              className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+            />
+            <div className="min-w-0">
+              <h2 className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white truncate">
+                Ward Triage Assistant
+              </h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                Ward {activeWard.wardNumber} · Depots, Bylaws & Faults
+              </p>
+            </div>
           </div>
           <button
             type="button"
