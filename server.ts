@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { registerAuthRoutes } from './server-auth';
+import { randomUUID } from 'node:crypto';
+import { resolveWardForAddress, submitCivicReport, CivicProxyError } from './server-civic';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +40,53 @@ async function createServer() {
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, hasGeminiKey: Boolean(process.env.GEMINI_API_KEY) });
+  });
+
+  // CivicRewards pilot bridge — mirrors api/civic/*.ts (Vercel functions) for
+  // local dev. See server-civic.ts for the shared logic and scope notes.
+  app.post('/api/civic/resolve-ward', async (req, res) => {
+    try {
+      const { address, actorId } = req.body as { address?: string; actorId?: string };
+      if (!address) { res.status(400).json({ error: 'address_required' }); return; }
+      const result = await resolveWardForAddress(address, actorId || req.ip || 'unknown');
+      res.json(result);
+    } catch (err) {
+      const code = err instanceof CivicProxyError ? err.code : 'civic_service_unavailable';
+      const status = err instanceof CivicProxyError ? err.status : 503;
+      res.status(status).json({ error: code });
+    }
+  });
+
+  app.post('/api/civic/submit-report', async (req, res) => {
+    try {
+      const body = req.body as {
+        name?: string; phone?: string; address?: string; category?: string;
+        description?: string; municipalReference?: string; actorId?: string;
+      };
+      if (!body.name || !body.phone || !body.address || !body.category || !body.description || !body.municipalReference) {
+        res.status(400).json({ error: 'missing_required_field' });
+        return;
+      }
+      const actorRawId = body.actorId || req.ip || 'unknown';
+      const { ward, lat, lng } = await resolveWardForAddress(body.address, actorRawId);
+      const result = await submitCivicReport({
+        idempotencyKey: randomUUID(),
+        municipalReference: body.municipalReference,
+        name: body.name,
+        phone: body.phone,
+        address: body.address,
+        latitude: lat,
+        longitude: lng,
+        category: body.category,
+        description: body.description,
+        actorRawId,
+      });
+      res.json({ ...result, ward });
+    } catch (err) {
+      const code = err instanceof CivicProxyError ? err.code : 'civic_service_unavailable';
+      const status = err instanceof CivicProxyError ? err.status : 503;
+      res.status(status).json({ error: code });
+    }
   });
 
   app.post('/api/forensics/analyze', async (req, res) => {

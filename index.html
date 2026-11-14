@@ -29,6 +29,22 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased selection:bg-teal-600 selection:text-white">
+    <!-- Telegram Mini App support: stash tgWebAppData from the URL hash into
+         sessionStorage before ANY app code runs. Telegram Web's iframe
+         delivery only puts start_param/initData in the hash on first load;
+         App.tsx's own router effect (window.history.replaceState) strips it
+         on mount, same failure mode fixed this way in the live Ward 115 Mini
+         App (app/ward-report/page.tsx, signal-desk-v4). -->
+    <script>
+      (function () {
+        try {
+          if (location.hash && location.hash.indexOf('tgWebAppData=') !== -1) {
+            sessionStorage.setItem('civic_tg_hash_backup', location.hash);
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

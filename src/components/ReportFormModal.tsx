@@ -317,6 +317,26 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
+  // ── CivicRewards pilot: real backend submission (Ward 115 only, Nov 2026).
+  // Separate from the rest of this wizard's local/optimistic state above —
+  // see server-civic.ts for why every submission here is forced isTest=true.
+  const [reporterName, setReporterName] = useState('');
+  const [reporterPhone, setReporterPhone] = useState('');
+  const [civicSubmitState, setCivicSubmitState] = useState<'idle' | 'submitting' | 'error'>('idle');
+  const [civicSubmitError, setCivicSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('civic_profile');
+      if (!raw) return;
+      const profile = JSON.parse(raw) as { name?: string; mobileZa?: string };
+      if (profile.name) setReporterName(profile.name);
+      if (profile.mobileZa) setReporterPhone(profile.mobileZa);
+    } catch {
+      // no stored profile — fields stay editable/empty
+    }
+  }, []);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const autoTimerRef = useRef<number | null>(null);
   const swipeRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
@@ -571,14 +591,81 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
     }
   };
 
-  const handleSubmitFinal = () => {
+  const BACKEND_CATEGORY: Record<ServiceCategoryId, string> = {
+    water: 'water',
+    electricity: 'electricity',
+    roads: 'roads',
+    streetlights: 'other',
+    waste: 'refuse',
+    parks: 'other',
+    safety: 'safety',
+    accounts: 'billing',
+    anticorruption: 'other',
+    notices: 'other',
+  };
+
+  const handleSubmitFinal = async () => {
     if (isBlockedSynthetic) return;
     if (!signedIn) {
       onRequireAuth();
       return;
     }
+    if (!reporterName.trim() || !reporterPhone.trim()) {
+      setCivicSubmitError('Your name and phone number are required to submit a test report.');
+      setCivicSubmitState('error');
+      return;
+    }
+    if (!/test/i.test(description) && !/test/i.test(title)) {
+      setCivicSubmitError('Pilot stage: please include the word "TEST" in the description — no live report can be delivered yet.');
+      setCivicSubmitState('error');
+      return;
+    }
 
-    const rewardPoints = forensics?.authenticityStatus === 'VERIFIED' ? 50 : previewUrl ? 25 : 15;
+    setCivicSubmitState('submitting');
+    setCivicSubmitError(null);
+    try {
+      const res = await fetch('/api/civic/submit-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: reporterName.trim(),
+          phone: reporterPhone.trim(),
+          address: address.trim(),
+          category: BACKEND_CATEGORY[categoryId] ?? 'other',
+          description: description.trim() || title.trim(),
+          municipalReference: municipalRef.trim() || undefined,
+          actorId: reporterPhone.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const message =
+          data.error === 'pilot_limited_to_ward_115'
+            ? "This pilot currently only covers Ward 115 (Fourways area) — we'll widen coverage once the DA data partnership is confirmed."
+            : data.error === 'test_description_required'
+              ? 'Pilot stage: please include the word "TEST" in the description.'
+              : data.error === 'address_not_found'
+                ? "Sorry, we couldn't place that address — please include street number, street name and suburb."
+                : data.error === 'civic_backend_not_configured'
+                  ? 'The pilot backend is not configured yet — this report was not sent anywhere.'
+                  : `Report could not be submitted (${data.error ?? 'unknown error'}).`;
+        setCivicSubmitError(message);
+        setCivicSubmitState('error');
+        return;
+      }
+      setCivicSubmitState('idle');
+    } catch (err) {
+      setCivicSubmitError('Could not reach the pilot backend — please try again shortly.');
+      setCivicSubmitState('error');
+      return;
+    }
+
+    // Real backend submission above succeeded — the optimistic local report
+    // below is this wizard's existing demo UI (map pin, AI forensics preview,
+    // rewards animation). Points are forced to 0: this is a TEST case by
+    // construction (server-enforced, see server-civic.ts), never resident
+    // adoption or impact data.
+    const rewardPoints = 0;
     const newId = `CP-2026-${Math.floor(1050 + Math.random() * 8900)}`;
 
     const report: CivicReport = {
@@ -589,7 +676,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       suburb: activeWard.suburbs[0],
       categoryId,
       departmentLabel: currentCategory.title,
-      title: title.trim() || `${currentCategory.shortTitle} fault at ${address}`,
+      title: `🧪 TEST — ${title.trim() || `${currentCategory.shortTitle} fault at ${address}`}`,
       description:
         description.trim() ||
         `Reported via CivicRewards AI mobile wizard for ${assignedDepot}.`,
@@ -1192,10 +1279,43 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
           {/* STEP 5: ONE-SCREEN MOBILE SUMMARY (TAP ANY SECTION TO EDIT) */}
           {step === 5 && (
             <div className="flex-1 flex flex-col justify-between gap-2 min-h-0">
+              <div className="p-2.5 border border-amber-400/50 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
+                🧪 TEST — Ward 115 pilot. This is a proof-of-concept only: no reward points are awarded, and your description must include the word "TEST". Wider coverage opens once the DA data partnership is confirmed.
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-mono text-slate-400">YOUR NAME</span>
+                  <input
+                    type="text"
+                    value={reporterName}
+                    onChange={(e) => setReporterName(e.target.value)}
+                    placeholder="Full name"
+                    className="p-2 text-xs border border-slate-200 dark:border-white/15 bg-white dark:bg-white/[0.03] text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-mono text-slate-400">YOUR PHONE (+27...)</span>
+                  <input
+                    type="tel"
+                    value={reporterPhone}
+                    onChange={(e) => setReporterPhone(e.target.value)}
+                    placeholder="+27821234567"
+                    className="p-2 text-xs border border-slate-200 dark:border-white/15 bg-white dark:bg-white/[0.03] text-slate-900 dark:text-white"
+                  />
+                </label>
+              </div>
+
+              {civicSubmitState === 'error' && civicSubmitError && (
+                <div className="p-2 border border-red-400/50 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 text-[11px]">
+                  {civicSubmitError}
+                </div>
+              )}
+
               <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
                 <span>Tap any section below to edit before escalating</span>
                 <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                  +{rewardPreview} Civic Credits
+                  TEST report · no points awarded
                 </span>
               </div>
 
@@ -1355,12 +1475,21 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
           ) : (
             <button
               type="button"
-              disabled={isAnalyzing || Boolean(isBlockedSynthetic)}
+              disabled={isAnalyzing || Boolean(isBlockedSynthetic) || civicSubmitState === 'submitting'}
               onClick={handleSubmitFinal}
               className="min-h-[42px] px-5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Confirm & Escalate</span>
+              {civicSubmitState === 'submitting' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Submitting TEST report…</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm & Submit TEST Report</span>
+                </>
+              )}
             </button>
           )}
         </div>
