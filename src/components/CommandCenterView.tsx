@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { MUNICIPALITIES, PUBLIC_NOTICES_DATA, SERVICE_CATEGORIES } from '../data/civicSeedData';
 import type {
+  CivicReport,
   ServiceCategoryId,
   UserProfile,
   WardRecord,
@@ -38,6 +39,8 @@ interface CommandCenterViewProps {
   onChangeServicesLayout: (layout: 'carousel' | 'tiles') => void;
   cardTimeMode: CardTimeMode;
   onChangeCardTimeMode: (mode: CardTimeMode) => void;
+  reports?: CivicReport[];
+  onCorroborateReport?: (reportId: string) => boolean | void;
 }
 
 const INCOME_BRACKETS = [
@@ -72,9 +75,22 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
   onChangeServicesLayout,
   cardTimeMode,
   onChangeCardTimeMode,
+  reports = [],
+  onCorroborateReport,
 }) => {
   const [activeCategoryIdx, setActiveCategoryIdx] = useState(0);
   const [infoDrawer, setInfoDrawer] = useState<'accounts' | 'anticorruption' | 'notices' | null>(null);
+
+  const activeCategory = SERVICE_CATEGORIES[activeCategoryIdx] ?? SERVICE_CATEGORIES[0];
+  const matchingActiveReport = useMemo(() => {
+    if (!reports || activeCategory.isInfoModule) return null;
+    return reports.find(
+      (r) =>
+        r.wardId === activeWard.id &&
+        r.status !== 'Resolved' &&
+        r.categoryId === activeCategory.id
+    );
+  }, [reports, activeWard.id, activeCategory.id, activeCategory.isInfoModule]);
 
   // Accounts survey state
   const [accountsStep, setAccountsStep] = useState<1 | 2 | 3>(1);
@@ -188,11 +204,11 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
           <button
             type="button"
             onClick={onOpenAuthModal}
-            className="min-h-[38px] px-3 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] hover:border-slate-300 dark:hover:border-white/20 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150"
+            title="Switch or Find Ward"
+            className="min-h-[38px] px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150 shadow-sm"
           >
-            <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span className="hidden sm:inline">{activeWard.councillor.name}</span>
-            <span className="sm:hidden">Ward</span>
+            <MapPin className="w-3.5 h-3.5 text-white" />
+            <span>My Wards</span>
           </button>
 
           <div
@@ -276,6 +292,44 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = React.memo(({
           </div>
         </div>
       </section>
+
+      {/* Contextual "Already Active" Incident Guard Banner */}
+      {matchingActiveReport && (
+        <aside
+          aria-label="Active outage in ward"
+          className="rounded-2xl border border-amber-500/40 dark:border-amber-400/35 bg-amber-500/10 dark:bg-amber-400/10 p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-slate-900 dark:text-white"
+        >
+          <div className="flex items-start gap-2.5 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+                <span className="font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                  Already Active in Ward {activeWard.wardNumber}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span className="text-slate-600 dark:text-slate-300 font-semibold">
+                  {matchingActiveReport.municipalRef || matchingActiveReport.id}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums font-semibold text-slate-700 dark:text-slate-200">
+                  +{matchingActiveReport.clusteredHouseholds} households linked
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                {matchingActiveReport.title} ({matchingActiveReport.address})
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onCorroborateReport?.(matchingActiveReport.id)}
+            className="shrink-0 min-h-[38px] px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150 shadow-xs"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>+1 Link (+15 CR)</span>
+          </button>
+        </aside>
+      )}
 
       {/* Viewport-Contained Editorial Carousel or Tiles Layout */}
       {servicesLayout === 'tiles' ? (

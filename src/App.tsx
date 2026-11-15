@@ -5,7 +5,6 @@ import { CivicAssistantDrawer } from './components/CivicAssistantDrawer';
 import { CommandCenterView } from './components/CommandCenterView';
 import { CouncillorDeskView } from './components/CouncillorDeskView';
 import { DirectoryView } from './components/DirectoryRewardsView';
-import { FloatingMenu } from './components/FloatingMenu';
 import { authClient, type SessionProfile } from './utils/authClient';
 import { getSastTimeOfDay, type CardTimeMode } from './utils/sastTime';
 import { VERIFY_FIX_POINTS, getVerificationWindowState } from './utils/verificationWindow';
@@ -34,17 +33,6 @@ import type {
   UserProfile,
   UserRole,
 } from './types/civic';
-
-const PAGE_ORDER: Array<{ id: AppView; label: string }> = [
-  { id: 'hub', label: 'Categories' },
-  { id: 'feed', label: 'Ward Feed' },
-  { id: 'map', label: 'Live Map' },
-  { id: 'desk', label: 'Councillor Desk' },
-  { id: 'social', label: 'Social Pulse' },
-  { id: 'directory', label: 'Ward Directory' },
-  { id: 'rewards', label: 'CivicRewards' },
-  { id: 'profile', label: 'My Profile & Bills' },
-];
 
 export default function App() {
   const [activeView, setActiveView] = useState<AppView>('hub');
@@ -138,8 +126,6 @@ export default function App() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const swipeStart = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
-
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
@@ -173,13 +159,25 @@ export default function App() {
     const view = params.get('view');
     const action = params.get('action');
     const validViews = ['hub', 'feed', 'map', 'desk', 'social', 'directory', 'rewards', 'profile'];
-    if (view && validViews.includes(view)) setActiveView(view as AppView);
+    if (view && validViews.includes(view)) {
+      if (view === 'desk' && role !== 'councillor') {
+        setActiveView('hub');
+      } else {
+        setActiveView(view as AppView);
+      }
+    }
     if (action === 'report') {
       setReportCategory('water');
       setReportModalOpen(true);
     }
     if (view || action) window.history.replaceState({}, '', window.location.pathname);
-  }, []);
+  }, [role]);
+
+  useEffect(() => {
+    if (role === 'resident' && activeView === 'desk') {
+      setActiveView('hub');
+    }
+  }, [role, activeView]);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -217,22 +215,6 @@ export default function App() {
     [reports]
   );
 
-  const visiblePages = useMemo(
-    () => PAGE_ORDER.filter((p) => p.id !== 'desk' || role === 'councillor'),
-    [role]
-  );
-
-  const currentPageIdx = Math.max(0, visiblePages.findIndex((p) => p.id === activeView));
-  const goToPrevPage = useCallback(() => {
-    const prevIdx = (currentPageIdx - 1 + visiblePages.length) % visiblePages.length;
-    setActiveView(visiblePages[prevIdx].id);
-  }, [currentPageIdx, visiblePages]);
-
-  const goToNextPage = useCallback(() => {
-    const nextIdx = (currentPageIdx + 1) % visiblePages.length;
-    setActiveView(visiblePages[nextIdx].id);
-  }, [currentPageIdx, visiblePages]);
-
   const pushReward = useCallback(
     (title: string, subtitle: string, points: number, type: 'earn' | 'redeem' = 'earn') => {
       setUser((prev) => ({
@@ -269,16 +251,23 @@ export default function App() {
 
   const handleSubmitNewReport = useCallback(
     (newReport: CivicReport, rewardPoints: number) => {
-      if (!requireAuth('log a fault report')) return;
       setReports((prev) => [newReport, ...prev]);
-      pushReward(
-        newReport.forensics.status === 'VERIFIED' ? 'Verified Live Capture Report' : 'Civic Fault Logged',
-        `${newReport.id} · ${newReport.title}`,
-        rewardPoints
-      );
-      setToastMessage(`Report ${newReport.id} escalated to ${activeWard.councillor.name} (+${rewardPoints} Civic Credits)`);
+      if (user.signedIn && rewardPoints > 0) {
+        pushReward(
+          newReport.forensics.status === 'VERIFIED' ? 'Verified Live Capture Report' : 'Civic Fault Logged',
+          `${newReport.id} · ${newReport.title}`,
+          rewardPoints
+        );
+        setToastMessage(
+          `Report ${newReport.id} escalated to ${activeWard.councillor.name} (+${rewardPoints} Civic Credits)`
+        );
+      } else {
+        setToastMessage(
+          `Report ${newReport.id} submitted as Guest. Sign in on Profile to earn Civic Credits.`
+        );
+      }
     },
-    [requireAuth, pushReward, activeWard.councillor.name]
+    [user.signedIn, pushReward, activeWard.councillor.name]
   );
 
   const handleCorroborateReport = useCallback(
@@ -516,34 +505,8 @@ export default function App() {
         onOpenAssistant={openAssistant}
       />
 
-      {/* Swipeable Paged Viewport */}
-      <main
-        onTouchStart={(e) => {
-          const target = e.target as HTMLElement;
-          const insideInteractiveTrack = Boolean(
-            target.closest('.leaflet-container') || target.closest('[aria-label="Smart Service Categories Gallery"]')
-          );
-          swipeStart.current = {
-            x: e.touches[0].clientX,
-            y: e.touches[0].clientY,
-            ignore: insideInteractiveTrack,
-          };
-        }}
-        onTouchEnd={(e) => {
-          if (!swipeStart.current || swipeStart.current.ignore) {
-            swipeStart.current = null;
-            return;
-          }
-          const dx = e.changedTouches[0].clientX - swipeStart.current.x;
-          const dy = e.changedTouches[0].clientY - swipeStart.current.y;
-          swipeStart.current = null;
-          if (Math.abs(dx) > 75 && Math.abs(dx) > Math.abs(dy) * 1.4) {
-            if (dx < 0) goToNextPage();
-            else goToPrevPage();
-          }
-        }}
-        className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-20 lg:pb-6 flex flex-col gap-3"
-      >
+      {/* Main Viewport Container */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-20 lg:pb-6 flex flex-col gap-3">
         <div className="flex-1 flex flex-col">
           {activeView === 'hub' && (
             <CommandCenterView
@@ -557,6 +520,8 @@ export default function App() {
               onChangeServicesLayout={handleChangeServicesLayout}
               cardTimeMode={cardTimeMode}
               onChangeCardTimeMode={setCardTimeMode}
+              reports={reports}
+              onCorroborateReport={handleCorroborateReport}
             />
           )}
 
@@ -644,16 +609,6 @@ export default function App() {
         onSelectView={setActiveView}
       />
 
-      <FloatingMenu
-        emergencyMode={emergencyMode}
-        onOpenReport={openDefaultReportModal}
-        onOpenMap={openMap}
-        onOpenAssistant={openAssistant}
-        onToggleEmergency={toggleEmergency}
-        onOpenWardPicker={openAuthModal}
-        onOpenProfile={openProfile}
-      />
-
       <BurgerMenuDrawer
         isOpen={burgerOpen}
         onClose={() => setBurgerOpen(false)}
@@ -663,6 +618,7 @@ export default function App() {
         user={user}
         role={role}
         onChangeRole={handleChangeRole}
+        activeTicketCount={activeTicketCount}
         darkMode={darkMode}
         onToggleDarkMode={toggleDarkMode}
         emergencyMode={emergencyMode}

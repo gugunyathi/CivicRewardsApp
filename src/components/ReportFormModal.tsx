@@ -628,10 +628,6 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
   const handleSubmitFinal = () => {
     if (isBlockedSynthetic) return;
-    if (!signedIn) {
-      onRequireAuth();
-      return;
-    }
 
     const step1Error = validateCurrentStep(1);
     if (step1Error) {
@@ -646,7 +642,13 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       return;
     }
 
-    const rewardPoints = forensics?.authenticityStatus === 'VERIFIED' ? 50 : previewUrl ? 25 : 15;
+    const rewardPoints = signedIn
+      ? forensics?.authenticityStatus === 'VERIFIED'
+        ? 50
+        : previewUrl
+          ? 25
+          : 15
+      : 0;
     const newId = `CP-2026-${Math.floor(1050 + Math.random() * 8900)}`;
 
     const parsedSuburbParts = reporterSuburb
@@ -691,7 +693,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       slaDeadlineHours: currentCategory.slaHours || 24,
       slaElapsedHours: 0,
       assignedDepot,
-      reporterName: reporterName.trim() || 'You (Ward Resident)',
+      reporterName: reporterName.trim() || (signedIn ? 'You (Ward Resident)' : 'Guest Resident'),
       photoUrl: previewUrl ?? undefined,
       forensics: {
         status: forensics?.authenticityStatus ?? 'WARNING_STRIPPED_METADATA',

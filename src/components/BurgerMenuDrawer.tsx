@@ -12,6 +12,8 @@ import {
   Moon,
   Radio,
   Sun,
+  LogIn,
+  LogOut,
   User,
   X,
 } from 'lucide-react';
@@ -26,12 +28,14 @@ interface BurgerMenuDrawerProps {
   user: UserProfile;
   role: UserRole;
   onChangeRole: (role: UserRole) => void;
+  activeTicketCount?: number;
   darkMode: boolean;
   onToggleDarkMode: () => void;
   emergencyMode: boolean;
   onToggleEmergency: () => void;
   onOpenAuthModal: () => void;
   onOpenAssistant: () => void;
+  onSignOut?: () => void;
 }
 
 const MENU_ITEMS: Array<{
@@ -47,7 +51,7 @@ const MENU_ITEMS: Array<{
   { id: 'desk', label: 'Councillor Desk', hint: 'SLA queue & routing', icon: ClipboardCheck, councillorOnly: true },
   { id: 'social', label: 'Social Pulse', hint: 'WhatsApp & group alerts', icon: Radio },
   { id: 'directory', label: 'Ward Directory', hint: 'Metros & councillors', icon: Building2 },
-  { id: 'profile', label: 'Profile, Bills & Rewards', hint: 'Reports, bills & vouchers', icon: User },
+  { id: 'rewards', label: 'Profile, Bills & Rewards', hint: 'Reports, bills & vouchers', icon: User },
 ];
 
 export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
@@ -59,12 +63,14 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
   user,
   role,
   onChangeRole,
+  activeTicketCount,
   darkMode,
   onToggleDarkMode,
   emergencyMode,
   onToggleEmergency,
   onOpenAuthModal,
   onOpenAssistant,
+  onSignOut,
 }) => {
   useEffect(() => {
     if (!isOpen) return;
@@ -108,6 +114,45 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Top of Burger Menu: Sign In / Account Status */}
+          {!user.signedIn ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onSelectView('profile');
+              }}
+              className="w-full min-h-[42px] px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.98] transition-[background-color,transform] duration-150"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In / Register</span>
+            </button>
+          ) : (
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/[0.08]">
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                  {user.name}
+                </div>
+                <div className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
+                  {user.mobileZa || user.emailOrHandle || 'Citizen'} · {user.credits} CR
+                </div>
+              </div>
+              {onSignOut && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSignOut();
+                    onClose();
+                  }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors duration-150 cursor-pointer shrink-0"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Resident / Councillor Role Switcher */}
           <div className="space-y-1.5">
@@ -171,7 +216,9 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
             {visibleMenuItems.map((item) => {
               const Icon = item.icon;
               const active =
-                activeView === item.id || (item.id === 'profile' && activeView === 'rewards');
+                activeView === item.id ||
+                ((item.id === 'rewards' || item.id === 'profile') &&
+                  (activeView === 'rewards' || activeView === 'profile'));
               return (
                 <button
                   key={item.id}
@@ -187,7 +234,7 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="text-xs font-semibold leading-tight">{item.label}</div>
                     <div
                       className={`text-[11px] truncate ${
@@ -197,6 +244,11 @@ export const BurgerMenuDrawer: React.FC<BurgerMenuDrawerProps> = ({
                       {item.hint}
                     </div>
                   </div>
+                  {item.id === 'desk' && typeof activeTicketCount === 'number' && activeTicketCount > 0 && (
+                    <span className="font-mono text-[10px] ml-auto px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold tabular-nums shrink-0">
+                      {activeTicketCount}
+                    </span>
+                  )}
                 </button>
               );
             })}

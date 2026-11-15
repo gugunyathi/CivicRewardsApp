@@ -67,6 +67,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
       const hay = [
         r.id,
         r.title,
+        r.description,
         r.address,
         r.suburb,
         r.departmentLabel,

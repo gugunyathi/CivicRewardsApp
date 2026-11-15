@@ -44,6 +44,179 @@ async function createServer() {
     });
   });
 
+  app.get('/api/ward/summary', (req, res) => {
+    const wardParam = String(req.query.ward || '115').replace(/[^0-9]/g, '') || '115';
+    res.json({
+      ok: true,
+      ward: Number(wardParam),
+      municipalityCode: 'CoJ',
+      activeIncidents: 6,
+      resolvedThisMonth: 84,
+      slaComplianceScore: 92,
+      totalCreditsDistributed: 28450,
+      primaryDepots: {
+        water: 'Joburg Water Randburg Depot',
+        electricity: 'City Power Bryanston Depot',
+        roads: 'JRA Region A Depot',
+      },
+      verifiedResolutionWindowMinutes: 15,
+    });
+  });
+
+  app.get('/api/reports', (req, res) => {
+    const ward = req.query.ward ? String(req.query.ward).toLowerCase() : null;
+    const status = req.query.status ? String(req.query.status).toLowerCase() : null;
+
+    // Return current server-authoritative mock reports snapshot
+    const serverReports = [
+      {
+        id: 'CP-2026-1041',
+        wardId: 'CoJ-115',
+        municipalityCode: 'CoJ',
+        wardNumber: 115,
+        suburb: 'Fourways',
+        categoryId: 'water',
+        departmentLabel: 'Joburg Water',
+        title: 'High-pressure 250mm water main burst on Cedar Rd',
+        address: 'Cedar Rd & Campbell Rd, Fourways, Sandton',
+        status: 'Escalated to Depot',
+        severity: 'CRITICAL',
+        isEmergency: true,
+        clusteredHouseholds: 38,
+        createdAtIso: '2026-03-24T05:45:00Z',
+        resolvedAtIso: null,
+        slaDeadlineHours: 24,
+        slaElapsedHours: 3,
+        assignedDepot: 'Joburg Water Randburg Depot',
+        municipalRef: 'JWAPP-40128554',
+      },
+      {
+        id: 'CP-2026-1038',
+        wardId: 'CoJ-115',
+        municipalityCode: 'CoJ',
+        wardNumber: 115,
+        suburb: 'Craigavon',
+        categoryId: 'electricity',
+        departmentLabel: 'City Power Johannesburg',
+        title: 'Mini-substation blown out on Elm Ave',
+        address: '42 Elm Ave, Craigavon, Fourways',
+        status: 'Resolved',
+        severity: 'HIGH',
+        isEmergency: false,
+        clusteredHouseholds: 24,
+        createdAtIso: '2026-03-24T06:10:00Z',
+        resolvedAtIso: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
+        slaDeadlineHours: 24,
+        slaElapsedHours: 2,
+        assignedDepot: 'City Power Bryanston Depot',
+        municipalRef: 'CPWEB5012172',
+      },
+    ];
+
+    const filtered = serverReports.filter((r) => {
+      if (ward && !r.wardId.toLowerCase().includes(ward) && String(r.wardNumber) !== ward) {
+        return false;
+      }
+      if (status && r.status.toLowerCase() !== status) {
+        return false;
+      }
+      return true;
+    });
+
+    res.json({
+      ok: true,
+      count: filtered.length,
+      reports: filtered,
+    });
+  });
+
+  app.post('/api/reports/corroborate', (req, res) => {
+    const { reportId, userPhone, wardId } = req.body as {
+      reportId?: string;
+      userPhone?: string;
+      wardId?: string;
+    };
+
+    if (!reportId) {
+      res.status(400).json({ error: 'Missing reportId' });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      reportId,
+      creditsEarned: 15,
+      wardId: wardId || 'CoJ-115',
+      userPhone: userPhone || 'anonymous',
+      message: 'Household successfully linked to incident cluster (+15 CR).',
+    });
+  });
+
+  app.post('/api/reports/verify', (req, res) => {
+    const { reportId, resolvedAtIso, userPhone } = req.body as {
+      reportId?: string;
+      resolvedAtIso?: string;
+      userPhone?: string;
+    };
+
+    if (!reportId) {
+      res.status(400).json({ error: 'Missing reportId' });
+      return;
+    }
+
+    const fifteenMinsMs = 15 * 60 * 1000;
+    const resolvedTime = resolvedAtIso ? new Date(resolvedAtIso).getTime() : Date.now();
+    const elapsedMs = Date.now() - resolvedTime;
+
+    if (elapsedMs > fifteenMinsMs) {
+      res.status(400).json({
+        ok: false,
+        error: 'Verification window expired. Restored services can only be verified for up to 15 minutes after restoration.',
+        elapsedMinutes: Math.round(elapsedMs / 60000),
+      });
+      return;
+    }
+
+    const remainingSec = Math.max(0, Math.round((fifteenMinsMs - elapsedMs) / 1000));
+    res.json({
+      ok: true,
+      reportId,
+      creditsEarned: 30,
+      remainingSeconds: remainingSec,
+      userPhone: userPhone || 'anonymous',
+      message: 'Restored service verified by resident (+30 CR).',
+    });
+  });
+
+  app.post('/api/rewards/redeem', (req, res) => {
+    const { offerId, costCredits, title, userPhone } = req.body as {
+      offerId?: string;
+      costCredits?: number;
+      title?: string;
+      userPhone?: string;
+    };
+
+    if (!offerId || typeof costCredits !== 'number') {
+      res.status(400).json({ error: 'Missing offerId or costCredits' });
+      return;
+    }
+
+    const voucherCode = `CP-${Math.floor(100000 + Math.random() * 900000)}`;
+    const expiresAtIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    res.json({
+      ok: true,
+      voucherCode,
+      offerId,
+      title: title || 'Civic Partner Voucher',
+      costCredits,
+      recipient: userPhone || 'Civic Resident',
+      issuedAtIso: new Date().toISOString(),
+      expiresAtIso,
+      instructions: 'Present this 6-digit PIN code at checkout or enter into municipal billing portal.',
+    });
+  });
+
   app.post('/api/forensics/analyze', async (req, res) => {
     try {
       const { imageBase64, mimeType, exifMetadata, reportedAddress, wardContext } = req.body as {
