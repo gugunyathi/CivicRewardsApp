@@ -1,12 +1,43 @@
-// api/social/summarize.ts – Vercel serverless function
+// api/social.ts – consolidated Vercel serverless function.
+// Serves: POST /api/social/link, POST /api/social/summarize
+// (see vercel.json rewrites, which map the nested paths here).
 import { Type } from '@google/genai';
-import { runEconomicAiWithFallback } from '../../server-ai';
+import { runEconomicAiWithFallback } from '../server-ai';
+import { recordSocialLinkEvent } from '../server-store';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
 };
 
-export default async function handler(req: any, res: any) {
+function handleLink(req: any, res: any) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const body =
+    typeof req.body === 'string'
+      ? JSON.parse(req.body || '{}')
+      : (req.body ?? {});
+
+  const { platform, wardId, linkedReportId, linkedRef } = body as {
+    platform?: string;
+    wardId?: string;
+    linkedReportId?: string | null;
+    linkedRef?: string | null;
+  };
+
+  recordSocialLinkEvent({
+    platform: platform || 'WhatsApp',
+    wardId: wardId || 'CoJ-115',
+    linkedReportId,
+    linkedRef,
+  });
+
+  res.status(200).json({ ok: true });
+}
+
+async function handleSummarize(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -64,4 +95,17 @@ export default async function handler(req: any, res: any) {
     console.error('Social API error:', message);
     return res.status(500).json({ error: message });
   }
+}
+
+export default async function handler(req: any, res: any) {
+  const action = String(req.query?.action || '');
+  if (action === 'link') {
+    handleLink(req, res);
+    return;
+  }
+  if (action === 'summarize') {
+    await handleSummarize(req, res);
+    return;
+  }
+  res.status(404).json({ error: `Unknown social action: ${action || '(missing)'}` });
 }

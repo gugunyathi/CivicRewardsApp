@@ -1,11 +1,43 @@
-// api/ward115/map.ts – Vercel serverless function
-import type { CivicReport, ReportStatus, ServiceCategoryId } from '../../src/types/civic';
+// api/ward.ts – consolidated Vercel serverless function.
+// Serves: GET /api/ward/summary, GET /api/ward115/map
+// (see vercel.json rewrites, which map the nested paths here).
+import { getStoreMetrics } from '../server-store';
+import type { CivicReport, ReportStatus, ServiceCategoryId } from '../src/types/civic';
 
 export const config = {
   api: {
     responseLimit: '8mb',
   },
 };
+
+function handleSummary(req: any, res: any) {
+  if (req.method && req.method !== 'GET') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const wardParam = String(req.query?.ward || '115').replace(/[^0-9]/g, '') || '115';
+  const wardNum = Number(wardParam);
+  const metrics = getStoreMetrics(wardNum);
+
+  res.status(200).json({
+    ok: true,
+    ward: wardNum,
+    municipalityCode: 'CoJ',
+    activeIncidents: Math.max(metrics.activeIncidents, 6),
+    resolvedThisMonth: 84 + metrics.resolvedCount,
+    slaComplianceScore: 92,
+    totalCreditsDistributed: 28450,
+    uniqueReporterNumbers: metrics.uniqueReporters,
+    totalReporterContacts: metrics.totalReporterContacts,
+    primaryDepots: {
+      water: 'Joburg Water Randburg Depot',
+      electricity: 'City Power Bryanston Depot',
+      roads: 'JRA Region A Depot',
+    },
+    verifiedResolutionWindowMinutes: 15,
+  });
+}
 
 const CATEGORY_MAP: Record<string, { id: ServiceCategoryId; dept: string; depot: string; sla: number }> = {
   water: { id: 'water', dept: 'Water & Sanitation', depot: 'Joburg Water Randburg Depot', sla: 24 },
@@ -201,7 +233,7 @@ async function loadWard115FromSignalDesk(): Promise<Ward115MapCache['payload']> 
   };
 }
 
-export default async function handler(_req: any, res: any) {
+async function handleWard115Map(_req: any, res: any) {
   try {
     if (ward115Cache && Date.now() - ward115Cache.fetchedAt < 90_000) {
       res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
@@ -229,4 +261,17 @@ export default async function handler(_req: any, res: any) {
       pins: [],
     });
   }
+}
+
+export default async function handler(req: any, res: any) {
+  const action = String(req.query?.action || '');
+  if (action === 'summary') {
+    handleSummary(req, res);
+    return;
+  }
+  if (action === 'map115') {
+    await handleWard115Map(req, res);
+    return;
+  }
+  res.status(404).json({ error: `Unknown ward action: ${action || '(missing)'}` });
 }

@@ -2,6 +2,19 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/api/chat", "destination": "/api/ai?action=chat" },
+    { "source": "/api/ai/status", "destination": "/api/ai?action=status" },
+    { "source": "/api/forensics/analyze", "destination": "/api/ai?action=forensics" },
+    { "source": "/api/reports/corroborate", "destination": "/api/reports?action=corroborate" },
+    { "source": "/api/reports/verify", "destination": "/api/reports?action=verify" },
+    { "source": "/api/reports/:id", "destination": "/api/reports?id=:id" },
+    { "source": "/api/rewards/pending", "destination": "/api/rewards?action=pending" },
+    { "source": "/api/rewards/claim", "destination": "/api/rewards?action=claim" },
+    { "source": "/api/rewards/redeem", "destination": "/api/rewards?action=redeem" },
+    { "source": "/api/social/link", "destination": "/api/social?action=link" },
+    { "source": "/api/social/summarize", "destination": "/api/social?action=summarize" },
+    { "source": "/api/ward/summary", "destination": "/api/ward?action=summary" },
+    { "source": "/api/ward115/map", "destination": "/api/ward?action=map115" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
