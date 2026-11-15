@@ -28,6 +28,15 @@
     }
   ],
   "functions": {
+    "api/ai.ts": {
+      "maxDuration": 60
+    },
+    "api/social.ts": {
+      "maxDuration": 60
+    },
+    "api/ward.ts": {
+      "maxDuration": 30
+    },
     "api/**/*.ts": {
       "maxDuration": 15
     }
