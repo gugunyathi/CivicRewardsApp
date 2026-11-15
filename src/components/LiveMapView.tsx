@@ -257,7 +257,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
           <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
             Ward {activeWard.wardNumber} — Live Map
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             {activeWard.suburbs[0]} · Tap any green, orange, or red pin to inspect, +1 Me Too, or verify fix
           </p>
         </div>
@@ -267,7 +267,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
             type="button"
             onClick={() => handlePreset((presetIdx - 1 + METRO_PRESETS.length) % METRO_PRESETS.length)}
             aria-label="Previous metro"
-            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 cursor-pointer active:scale-95 transition-transform duration-150"
+            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-800 dark:text-slate-200 cursor-pointer active:scale-95 transition-transform duration-150"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -281,7 +281,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                 className={`min-h-[36px] px-3 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 border transition-colors duration-150 cursor-pointer ${
                   presetIdx === idx
                     ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-950 dark:border-white'
-                    : 'bg-white dark:bg-[#111827] text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-white/[0.08]'
+                    : 'bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-white/[0.08]'
                 }`}
               >
                 {preset.label}
@@ -293,7 +293,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
             type="button"
             onClick={() => handlePreset((presetIdx + 1) % METRO_PRESETS.length)}
             aria-label="Next metro"
-            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 cursor-pointer active:scale-95 transition-transform duration-150"
+            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-800 dark:text-slate-200 cursor-pointer active:scale-95 transition-transform duration-150"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -303,11 +303,11 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
       {/* Basemap switcher + Pin counts */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
-          className="flex items-center gap-1 p-1 rounded-xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08]"
+          className="flex items-center gap-1 p-1 rounded-xl bg-white dark:bg-[#111827] border border-slate-300 dark:border-white/[0.08]"
           role="group"
           aria-label="Mapbox basemap style"
         >
-          <span className="pl-1.5 pr-1 text-slate-400 flex items-center gap-1 text-[10px] font-mono font-semibold" title="Mapbox Styles">
+          <span className="pl-1.5 pr-1 text-slate-700 dark:text-slate-400 flex items-center gap-1 text-[10px] font-mono font-semibold" title="Mapbox Styles">
             <Layers className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Mapbox</span>
           </span>
@@ -320,7 +320,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
               className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold cursor-pointer transition-colors duration-150 ${
                 (basemap ?? (darkMode ? 'dark' : 'streets')) === id
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950'
-                  : 'text-slate-600 dark:text-slate-300'
+                  : 'text-slate-700 dark:text-slate-300'
               }`}
             >
               {BASEMAPS[id].shortLabel}
@@ -328,11 +328,11 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
           ))}
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+        <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
           {MAP_LEGEND.map((item) => (
             <span key={item.label} className="flex items-center gap-1.5">
               <span
-                className="w-2.5 h-2.5 rounded-full border border-white/70 shrink-0"
+                className="w-2.5 h-2.5 rounded-full border border-slate-400 dark:border-white/70 shrink-0"
                 style={{ backgroundColor: item.color }}
               />
               {item.label}
@@ -342,7 +342,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
       </div>
 
       {/* Viewport-Contained Live Map Frame (Signal Desk Ward 115 style) */}
-      <div className="relative h-[calc(100dvh-248px)] min-h-[430px] max-h-[680px] rounded-2xl border border-slate-200/80 dark:border-white/[0.08] overflow-hidden bg-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="relative h-[calc(100dvh-248px)] min-h-[430px] max-h-[680px] rounded-2xl border border-slate-300 dark:border-white/[0.08] overflow-hidden bg-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
         <InteractiveMap
           centerLat={mapFocus.lat}
           centerLng={mapFocus.lng}
@@ -409,9 +409,9 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
             type="button"
             onClick={handleLocateMe}
             title="Center on my GPS location"
-            className="min-h-[38px] px-3 rounded-xl bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md border border-slate-200/80 dark:border-white/15 text-xs font-medium text-slate-800 dark:text-white flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+            className="min-h-[38px] px-3 rounded-xl bg-white/95 dark:bg-[#0B0F17]/90 backdrop-blur-md border border-slate-300 dark:border-white/15 text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150 shadow-sm"
           >
-            <LocateFixed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <LocateFixed className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
             <span className="hidden sm:inline">My GPS</span>
           </button>
 
@@ -425,32 +425,12 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
           </button>
         </div>
 
-        {/* Bottom-Left Floating Report Status Legend (Signal Desk style) */}
-        {!selectedReport && (
-          <div className="absolute bottom-7 left-3 z-[400] rounded-xl bg-slate-950/85 border border-white/15 backdrop-blur-md px-3 py-2 text-white shadow-lg pointer-events-none">
-            <div className="text-[9px] font-bold uppercase tracking-wider text-white/50 mb-1">
-              Report status
-            </div>
-            <div className="space-y-1">
-              {MAP_LEGEND.map((item) => (
-                <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-white/80">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Pin Popup Preview Card (only shown when a user clicks a pin) */}
         {selectedReport && (
           <div
             role="dialog"
             aria-label={`Report preview ${selectedReport.id}`}
-            className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-[376px] z-[500] rounded-2xl bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border border-slate-200/80 dark:border-white/15 shadow-2xl overflow-hidden ui-modal-enter"
+            className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-[376px] z-[500] rounded-2xl bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border border-slate-300 dark:border-white/15 shadow-2xl overflow-hidden ui-modal-enter"
           >
             <div className="flex items-start gap-3 p-3">
               <SmartImage
@@ -458,13 +438,13 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                 alt={selectedReport.title}
                 categoryId={selectedReport.categoryId}
                 label={selectedReport.categoryId}
-                className="w-20 h-20 rounded-xl shrink-0 border border-slate-200/80 dark:border-white/[0.08]"
+                className="w-20 h-20 rounded-xl shrink-0 border border-slate-300 dark:border-white/[0.08]"
                 imgClassName="w-full h-full object-cover"
               />
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-start justify-between gap-1.5">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300 tabular-nums truncate">
+                    <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-slate-700 dark:text-slate-300 tabular-nums truncate">
                       <span
                         className="w-2 h-2 rounded-full shrink-0"
                         style={{ backgroundColor: getReportPinColor(selectedReport) }}
@@ -481,18 +461,18 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                     type="button"
                     onClick={() => setSelectedReportId(null)}
                     aria-label="Close pin popup"
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer shrink-0"
+                    className="p-1 rounded-lg text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white cursor-pointer shrink-0"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300">
+                <div className="flex items-center justify-between text-[11px] text-slate-700 dark:text-slate-300">
                   <span className="flex items-center gap-1 min-w-0">
                     {selectedReport.forensics.status === 'VERIFIED' ? (
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-500 shrink-0" />
                     ) : (
-                      <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <ShieldAlert className="w-3.5 h-3.5 text-amber-700 dark:text-amber-500 shrink-0" />
                     )}
                     <span className="truncate font-medium">{selectedReport.status}</span>
                   </span>
@@ -507,7 +487,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                 </div>
 
                 {selectedVerifyState?.isRestored && selectedVerifyState.withinWindow && (
-                  <div className="flex items-center justify-between gap-2 text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-600/10 border border-emerald-600/20 rounded-lg px-2 py-1 tabular-nums">
+                  <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-600/12 border border-emerald-600/35 rounded-lg px-2 py-1 tabular-nums">
                     <span className="flex items-center gap-1 truncate">
                       <Clock className="w-3 h-3 shrink-0" />
                       <span>
@@ -526,7 +506,7 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                   href={osmDirectionsUrl(selectedReport.lat, selectedReport.lng)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline tabular-nums"
+                  className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline tabular-nums"
                 >
                   <ExternalLink className="w-3 h-3" />
                   <span>
@@ -553,15 +533,15 @@ export const LiveMapView: React.FC<LiveMapViewProps> = React.memo(({
                     );
                   }}
                   title="Share report to WhatsApp"
-                  className="min-h-[36px] px-2.5 rounded-xl border border-slate-200/90 dark:border-white/15 text-xs font-semibold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                  className="min-h-[36px] px-2.5 rounded-xl border border-slate-300 dark:border-white/15 text-xs font-semibold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                 >
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                   <span>Share</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePinCorroborate(selectedReport.id)}
-                  className="flex-1 min-h-[36px] px-2.5 rounded-xl border border-emerald-600/35 dark:border-emerald-400/35 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                  className="flex-1 min-h-[36px] px-2.5 rounded-xl border border-emerald-700/45 dark:border-emerald-400/35 bg-emerald-600/12 text-emerald-800 dark:text-emerald-300 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform duration-150"
                 >
                   +1 Me Too ({selectedReport.clusteredHouseholds})
                 </button>

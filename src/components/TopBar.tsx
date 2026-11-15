@@ -3,13 +3,12 @@ import {
   AlertTriangle,
   MapPin,
   Menu,
-  MessageSquareText,
   Moon,
   Sun,
   User,
 } from 'lucide-react';
 import type { AppView, UserProfile, UserRole, WardRecord } from '../types/civic';
-import { InstallButton } from './InstallButton';
+import { AiAssistantIcon } from './AiAssistantIcon';
 
 interface TopBarProps {
   activeView: AppView;
@@ -66,7 +65,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const navItems = role === 'councillor' ? COUNCILLOR_NAV : RESIDENT_NAV;
 
   return (
-    <header className="sticky top-0 z-40 h-14 border-b border-slate-200/80 dark:border-white/[0.08] bg-white/85 dark:bg-[#0B0F17]/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 h-14 border-b border-slate-300 dark:border-white/[0.08] bg-white/95 dark:bg-[#0B0F17]/85 backdrop-blur-md">
       <div className="max-w-7xl mx-auto h-full px-3 sm:px-6 flex items-center justify-between gap-2 lg:gap-4">
         {/* Left: Menu Trigger + Brand + Active Ward */}
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
@@ -74,7 +73,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             type="button"
             onClick={onOpenBurgerMenu}
             aria-label="Open navigation menu"
-            className="min-h-[38px] min-w-[38px] rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-200 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
+            className="min-h-[38px] min-w-[38px] rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-800 dark:text-slate-200 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -82,12 +81,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           <button
             type="button"
             onClick={() => onSelectView('hub')}
-            className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0 active:scale-[0.98] transition-transform duration-150 cursor-pointer"
+            className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-slate-950 dark:text-white whitespace-nowrap shrink-0 active:scale-[0.98] transition-transform duration-150 cursor-pointer"
           >
             <img
               src="/assets/logo-mark.png"
               alt="CivicRewards logo"
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-white p-0.5 border border-slate-300 dark:border-white/15 object-contain shrink-0"
             />
             <span>CivicRewards</span>
           </button>
@@ -98,8 +97,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             title="Switch Ward or Manage Profile"
             className="hidden sm:flex items-center gap-1.5 min-h-[34px] px-2.5 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] text-left active:scale-[0.98] transition-[transform,background-color] duration-150 min-w-0 cursor-pointer"
           >
-            <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate max-w-[160px] tabular-nums">
+            <MapPin className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[160px] tabular-nums">
               Ward {activeWard.wardNumber} · {activeWard.municipalityCode}
             </span>
           </button>
@@ -118,7 +117,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 className={`whitespace-nowrap shrink-0 px-2.5 py-1.5 rounded-lg transition-colors duration-150 active:scale-[0.98] cursor-pointer flex items-center gap-1 ${
                   active
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/[0.06]'
+                    : 'text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06]'
                 }`}
               >
                 <span>{item.label}</span>
@@ -138,7 +137,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           <div
             role="group"
             aria-label="App view role"
-            className="hidden md:flex items-center rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-100/80 dark:bg-white/[0.04] p-0.5"
+            className="hidden md:flex items-center rounded-xl border border-slate-300 dark:border-white/[0.08] bg-slate-200/80 dark:bg-white/[0.04] p-0.5"
           >
             <button
               type="button"
@@ -146,8 +145,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               aria-pressed={role === 'resident'}
               className={`min-h-[28px] px-2.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-colors duration-150 ${
                 role === 'resident'
-                  ? 'bg-white text-slate-900 shadow-xs dark:bg-white dark:text-slate-950'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white text-slate-950 shadow-xs dark:bg-white dark:text-slate-950'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
               }`}
             >
               Resident
@@ -159,19 +158,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               className={`min-h-[28px] px-2.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-colors duration-150 ${
                 role === 'councillor'
                   ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
               }`}
             >
               Councillor
             </button>
           </div>
 
-          <InstallButton />
-
           <button
             type="button"
             onClick={() => onSelectView('rewards')}
-            className="hidden sm:flex items-center min-h-[34px] px-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums whitespace-nowrap shrink-0 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
+            className="hidden sm:flex items-center min-h-[34px] px-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums whitespace-nowrap shrink-0 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
             title="View Credits & Redeem Vouchers"
           >
             {user.credits} CR
@@ -182,9 +179,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onClick={onOpenAssistant}
             aria-label="Open Ward Triage Assistant"
             title="Ward Triage Assistant"
-            className="min-h-[34px] min-w-[34px] rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border border-slate-200/80 dark:border-white/12 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
+            className="min-h-[34px] min-w-[34px] rounded-xl flex items-center justify-center text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border border-slate-300 dark:border-white/12 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
           >
-            <MessageSquareText className="w-4 h-4" />
+            <AiAssistantIcon className="w-[18px] h-[18px]" />
           </button>
 
           <button
@@ -195,7 +192,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             className={`min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1 whitespace-nowrap shrink-0 active:scale-[0.98] transition-[transform,background-color,border-color,color] duration-150 cursor-pointer border ${
               emergencyMode
                 ? 'bg-red-600 border-red-600 text-white'
-                : 'border-slate-200/80 dark:border-white/12 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
+                : 'border-slate-300 dark:border-white/12 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -206,7 +203,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             type="button"
             onClick={onToggleDarkMode}
             aria-label={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className="min-h-[34px] min-w-[34px] rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
+            className="min-h-[34px] min-w-[34px] rounded-xl flex items-center justify-center border border-slate-300 dark:border-white/12 text-indigo-700 dark:text-amber-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer"
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -219,7 +216,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             className={`min-h-[36px] min-w-[36px] px-2.5 rounded-xl flex items-center justify-center gap-1.5 border active:scale-[0.98] transition-[transform,background-color,border-color] duration-150 cursor-pointer shrink-0 ${
               activeView === 'profile' || activeView === 'rewards'
                 ? 'bg-emerald-600 border-emerald-600 text-white'
-                : 'border-slate-200/80 dark:border-white/12 bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-white/25'
+                : 'border-slate-300 dark:border-white/12 bg-white dark:bg-[#111827] text-slate-800 dark:text-slate-200 hover:border-slate-500 dark:hover:border-white/25'
             }`}
           >
             <User className="w-4 h-4" />

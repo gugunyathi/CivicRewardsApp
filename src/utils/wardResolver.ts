@@ -62,6 +62,7 @@ export function resolveWardByQuery(query: string): WardRecord | null {
 export function getDepotForCategory(ward: WardRecord, categoryId: string): string {
   switch (categoryId) {
     case 'water':
+    case 'sanitation':
       return ward.depots.water;
     case 'electricity':
     case 'streetlights':

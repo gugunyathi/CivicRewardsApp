@@ -172,7 +172,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
   };
 
   const handleConfirmTicket = (msgId: string, draft: NonNullable<ChatMessage['ticketDraft']>) => {
-    const validCat = (['water', 'electricity', 'roads', 'streetlights', 'waste', 'parks', 'safety'].includes(
+    const validCat = (['water', 'electricity', 'waste', 'sanitation', 'roads', 'streetlights', 'parks', 'safety'].includes(
       draft.categoryId
     )
       ? draft.categoryId
@@ -235,20 +235,20 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-md h-full bg-white dark:bg-[#111827] border-l border-slate-200/80 dark:border-white/[0.08] flex flex-col shadow-2xl ui-drawer-right overscroll-contain">
+      <div className="w-full max-w-md h-full bg-white dark:bg-[#111827] border-l border-slate-300 dark:border-white/[0.08] flex flex-col shadow-2xl ui-drawer-right overscroll-contain">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-2">
+        <div className="px-5 py-4 border-b border-slate-300 dark:border-white/[0.08] flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <img
               src="/assets/logo-mark.png"
               alt="CivicRewards logo"
-              className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+              className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-300 dark:border-white/15 object-contain shrink-0"
             />
             <div className="min-w-0">
               <h2 className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white truncate">
                 Ward Triage Assistant
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
                 Ward {activeWard.wardNumber} · Depots, Bylaws & Faults
               </p>
             </div>
@@ -257,7 +257,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close triage assistant"
-            className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-500 cursor-pointer transition-colors duration-150"
+            className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl hover:bg-slate-200/70 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-400 cursor-pointer transition-colors duration-150"
           >
             <X className="w-5 h-5" />
           </button>
@@ -274,7 +274,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
                 className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed space-y-2 ${
                   m.role === 'user'
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-100 dark:bg-white/[0.06] text-slate-900 dark:text-slate-100'
+                    : 'bg-slate-100 border border-slate-300/80 dark:border-transparent dark:bg-white/[0.06] text-slate-900 dark:text-slate-100'
                 }`}
               >
                 {m.imagePreview && (
@@ -289,7 +289,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
                 {m.role === 'assistant' &&
                   m.actionType === 'CORROBORATE_EXISTING' &&
                   m.matchedReportId && (
-                    <div className="pt-2 border-t border-slate-200/80 dark:border-white/10">
+                    <div className="pt-2 border-t border-slate-300 dark:border-white/10">
                       <button
                         type="button"
                         disabled={m.actionExecuted}
@@ -312,8 +312,8 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
                   )}
 
                 {m.role === 'assistant' && m.actionType === 'CREATE_TICKET' && m.ticketDraft && (
-                  <div className="pt-2 border-t border-slate-200/80 dark:border-white/10 space-y-2">
-                    <div className="text-[11px] font-mono opacity-80">
+                  <div className="pt-2 border-t border-slate-300 dark:border-white/10 space-y-2">
+                    <div className="text-[11px] font-mono text-slate-700 dark:text-slate-300">
                       {m.ticketDraft.title} · {m.ticketDraft.address} ({m.ticketDraft.severity})
                     </div>
                     <button
@@ -336,21 +336,21 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
           ))}
 
           {isSending && (
-            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
+            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-700 dark:text-emerald-400" />
               <span>Checking ward records...</span>
             </div>
           )}
         </div>
 
         {/* Suggested Prompts */}
-        <div className="px-4 py-2.5 border-t border-slate-200/80 dark:border-white/[0.08] flex gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="px-4 py-2.5 border-t border-slate-300 dark:border-white/[0.08] flex gap-1.5 overflow-x-auto no-scrollbar">
           {SUGGESTED_PROMPTS.map((p, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => void sendMessage(p)}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/[0.05] hover:bg-slate-200 dark:hover:bg-white/10 text-[11px] text-slate-700 dark:text-slate-200 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150"
+              className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-transparent bg-slate-100 dark:bg-white/[0.05] hover:bg-slate-200 dark:hover:bg-white/10 text-[11px] font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150"
             >
               {p}
             </button>
@@ -363,10 +363,10 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
             e.preventDefault();
             void sendMessage();
           }}
-          className="p-3.5 sm:p-4 border-t border-slate-200/80 dark:border-white/[0.08] space-y-2"
+          className="p-3.5 sm:p-4 border-t border-slate-300 dark:border-white/[0.08] space-y-2"
         >
           {attachedImage && (
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100 dark:bg-white/[0.05] text-xs">
+            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100 border border-slate-300 dark:border-transparent dark:bg-white/[0.05] text-xs text-slate-800 dark:text-slate-200">
               <div className="flex items-center gap-2">
                 <img src={attachedImage.preview} alt="Preview" className="w-8 h-8 rounded-lg object-cover" />
                 <span>Photo attached</span>
@@ -374,7 +374,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => setAttachedImage(null)}
-                className="text-slate-500 hover:text-slate-800 cursor-pointer"
+                className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -396,7 +396,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
               type="button"
               onClick={() => fileRef.current?.click()}
               aria-label="Attach fault photo"
-              className="h-11 w-11 flex items-center justify-center rounded-xl border border-slate-200/90 dark:border-white/12 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] cursor-pointer active:scale-95 transition-transform duration-150 shrink-0"
+              className="h-11 w-11 flex items-center justify-center rounded-xl border border-slate-400 dark:border-white/12 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.05] cursor-pointer active:scale-95 transition-transform duration-150 shrink-0"
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -406,7 +406,7 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Report a fault or ask a question..."
-              className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600 transition-[border-color,box-shadow,background-color] duration-150"
+              className="flex-1 h-11 px-3.5 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm text-slate-950 dark:text-white placeholder:text-slate-500 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 transition-[border-color,box-shadow,background-color] duration-150"
             />
 
             <button

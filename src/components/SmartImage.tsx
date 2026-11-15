@@ -12,6 +12,7 @@ import {
   Shield,
   Trash2,
   Trees,
+  Waves,
   Zap,
 } from 'lucide-react';
 import type { ServiceCategoryId } from '../types/civic';
@@ -22,9 +23,10 @@ const CATEGORY_VISUALS: Record<
 > = {
   water: { icon: Droplets, bg: '#0f293a', fg: '#7dd3fc' },
   electricity: { icon: Zap, bg: '#2d1c08', fg: '#fbbf24' },
+  waste: { icon: Trash2, bg: '#1e293b', fg: '#94a3b8' },
+  sanitation: { icon: Waves, bg: '#0d2b30', fg: '#2dd4bf' },
   roads: { icon: Route, bg: '#0b2619', fg: '#4ade80' },
   streetlights: { icon: Lightbulb, bg: '#2c1d07', fg: '#fde047' },
-  waste: { icon: Trash2, bg: '#1e293b', fg: '#94a3b8' },
   parks: { icon: Trees, bg: '#0b2619', fg: '#86efac' },
   safety: { icon: Shield, bg: '#172554', fg: '#93c5fd' },
   accounts: { icon: CreditCard, bg: '#112a36', fg: '#67e8f9' },

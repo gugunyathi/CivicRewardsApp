@@ -25,6 +25,8 @@ interface WardFeedViewProps {
   reports: CivicReport[];
   activeWard: WardRecord;
   verifiedFixIds: string[];
+  focusedReportId?: string | null;
+  onClearFocusedReport?: () => void;
   onCorroborateReport: (reportId: string) => void;
   onVerifyResolution: (reportId: string, report?: CivicReport) => void;
   onOpenReportModal: () => void;
@@ -38,6 +40,8 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
   reports,
   activeWard,
   verifiedFixIds,
+  focusedReportId,
+  onClearFocusedReport,
   onCorroborateReport,
   onVerifyResolution,
   onOpenReportModal,
@@ -46,6 +50,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
   const [scope, setScope] = useState<'all' | 'ward' | 'verified' | 'blocked'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleLimit, setVisibleLimit] = useState(6);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const counts = useMemo(
     () => ({
@@ -96,6 +101,44 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
     return () => window.clearInterval(timer);
   }, [hasActiveVerifyWindow]);
 
+  useEffect(() => {
+    if (!focusedReportId) return;
+    const targetIdx = reports.findIndex((r) => r.id === focusedReportId);
+    if (targetIdx === -1) return;
+
+    setScope(reports[targetIdx]?.wardId === activeWard.id ? 'ward' : 'all');
+    setSearchQuery('');
+
+    const wardOrAll = reports[targetIdx]?.wardId === activeWard.id
+      ? reports.filter((r) => r.wardId === activeWard.id)
+      : reports;
+    const idxInScope = wardOrAll.findIndex((r) => r.id === focusedReportId);
+    if (idxInScope >= 0) {
+      setVisibleLimit((prev) => Math.max(prev, idxInScope + 2));
+    }
+
+    setHighlightedId(focusedReportId);
+    const scrollTimer = window.setTimeout(() => {
+      const el = document.getElementById(`feed-report-${focusedReportId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      onClearFocusedReport?.();
+    }, 80);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+    };
+  }, [focusedReportId, reports, activeWard.id, onClearFocusedReport]);
+
+  useEffect(() => {
+    if (!highlightedId) return;
+    const clearTimer = window.setTimeout(() => {
+      setHighlightedId(null);
+    }, 5500);
+    return () => window.clearTimeout(clearTimer);
+  }, [highlightedId]);
+
   const handleScopeChange = (nextScope: typeof scope) => {
     setScope(nextScope);
     setVisibleLimit(6);
@@ -108,7 +151,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
           <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
             Live Ward Feed
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             Verified ward incidents · Ward {activeWard.wardNumber}
           </p>
         </div>
@@ -117,9 +160,9 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
           <button
             type="button"
             onClick={onOpenOnMap}
-            className="min-h-[38px] px-3.5 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] hover:border-slate-300 text-xs font-semibold text-slate-800 dark:text-white flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150"
+            className="min-h-[38px] px-3.5 rounded-xl border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] hover:border-slate-500 text-xs font-semibold text-slate-800 dark:text-white flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150"
           >
-            <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <MapPin className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
             <span>Map View</span>
           </button>
           <button
@@ -134,7 +177,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
       </div>
 
       {/* Filter Tabs + Instant Search */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 rounded-2xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] p-2.5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 rounded-2xl border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] p-2.5">
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {(
             [
@@ -151,7 +194,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
               className={`min-h-[34px] px-3 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 tabular-nums ${
                 scope === tab.id
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
               }`}
             >
               {tab.label}
@@ -160,7 +203,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
         </div>
 
         <div className="relative flex-1 md:max-w-xs">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
@@ -170,14 +213,14 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
             }}
             placeholder="Search street, fault, or ref # (e.g. CPWEB)..."
             aria-label="Search ward reports"
-            className="w-full h-9 pl-8 pr-8 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-xs text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600 transition-[border-color,box-shadow,background-color] duration-150"
+            className="w-full h-9 pl-8 pr-8 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-xs text-slate-950 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 transition-[border-color,box-shadow,background-color] duration-150"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
               aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -208,7 +251,12 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
             return (
               <article
                 key={report.id}
-                className="rounded-2xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden flex flex-col"
+                id={`feed-report-${report.id}`}
+                className={`rounded-2xl border overflow-hidden flex flex-col transition-[border-color,box-shadow,background-color] duration-500 ${
+                  highlightedId === report.id
+                    ? 'border-emerald-600 ring-2 ring-emerald-600/35 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-400 shadow-md'
+                    : 'border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] shadow-sm'
+                }`}
               >
                 <div className="relative h-44 sm:h-48 bg-slate-900 overflow-hidden">
                   <SmartImage
@@ -229,26 +277,33 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
 
                 <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between gap-3">
                   <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="font-semibold text-slate-900 dark:text-white">
-                        {report.municipalityCode} Ward {report.wardNumber} · {report.suburb}
-                      </span>
-                      <span aria-hidden="true">·</span>
-                      <span>{report.departmentLabel}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className="font-mono">{report.timeAgoLabel}</span>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+                      <div className="flex flex-wrap items-center gap-x-2">
+                        <span className="font-semibold text-slate-950 dark:text-white">
+                          {report.municipalityCode} Ward {report.wardNumber} · {report.suburb}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>{report.departmentLabel}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-mono">{report.timeAgoLabel}</span>
+                      </div>
+                      {highlightedId === report.id && (
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                          Latest Submission
+                        </span>
+                      )}
                     </div>
 
-                    <h2 className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white leading-snug">
+                    <h2 className="font-display text-base font-bold tracking-tight text-slate-950 dark:text-white leading-snug">
                       {report.title}
                     </h2>
 
                     <div
-                      className={`flex items-center gap-1.5 text-xs font-medium ${
+                      className={`flex items-center gap-1.5 text-xs font-semibold ${
                         isVerified
                           ? 'text-emerald-700 dark:text-emerald-400'
                           : isBlocked
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-red-700 dark:text-red-400'
                             : 'text-amber-700 dark:text-amber-400'
                       }`}
                     >
@@ -258,7 +313,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
                       <span className="truncate">{report.forensics.summaryLabel}</span>
                     </div>
 
-                    <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    <div className="font-mono text-[11px] text-slate-600 dark:text-slate-400 truncate">
                       {report.forensics.timestampLabel} · {report.forensics.gpsMatchLabel}
                     </div>
 
@@ -268,7 +323,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
                     </div>
 
                     {verifyState.isRestored && verifyState.withinWindow && (
-                      <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-600/10 border border-emerald-600/20 rounded-lg px-2.5 py-1.5 tabular-nums">
+                      <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-emerald-800 dark:text-emerald-300 bg-emerald-600/10 border border-emerald-700/25 rounded-lg px-2.5 py-1.5 tabular-nums">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 shrink-0" />
                           <span>
@@ -291,18 +346,18 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
                         darkMode={isDarkTheme()}
                         label={`${report.lat.toFixed(3)}, ${report.lng.toFixed(3)}`}
                         pinColor={isBlocked ? '#dc2626' : isVerified ? '#059669' : '#0f172a'}
-                        className="w-32 h-20 shrink-0 border border-slate-200/80 dark:border-white/[0.08]"
+                        className="w-32 h-20 shrink-0 border border-slate-300 dark:border-white/[0.08]"
                         onExpand={onOpenOnMap}
                       />
-                      <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 text-[11px] text-slate-600 dark:text-slate-300">
+                      <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 text-[11px] text-slate-700 dark:text-slate-300">
                         <span className="flex items-start gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                          <MapPin className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
                           <span className="line-clamp-2">{report.address}</span>
                         </span>
                         <button
                           type="button"
                           onClick={onOpenOnMap}
-                          className="self-start font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                          className="self-start font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                         >
                           Open on live map →
                         </button>
@@ -310,9 +365,9 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-mono tabular-nums text-slate-600 dark:text-slate-300">
-                      <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <div className="pt-3 border-t border-slate-200 dark:border-white/[0.06] flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-mono tabular-nums text-slate-700 dark:text-slate-300">
+                      <Users className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                       <span>+{report.clusteredHouseholds} Households</span>
                     </div>
 
@@ -332,16 +387,16 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
                               )
                             }
                             title="Share report to WhatsApp"
-                            className="min-h-[34px] px-2.5 rounded-lg border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                            className="min-h-[34px] px-2.5 rounded-lg border border-slate-400 dark:border-white/12 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                           >
-                            <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                             <span>Share</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => onCorroborateReport(report.id)}
-                          className="min-h-[34px] px-2.5 rounded-lg border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                          className="min-h-[34px] px-2.5 rounded-lg border border-slate-400 dark:border-white/12 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                         >
                           +1 Me Too
                         </button>
@@ -355,7 +410,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
                             <span>Verify Fix (+{VERIFY_FIX_POINTS} CR)</span>
                           </button>
                         ) : verifyState.alreadyVerifiedByUser && verifyState.withinWindow ? (
-                          <span className="min-h-[34px] px-2.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          <span className="min-h-[34px] px-2.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>Verified (+{VERIFY_FIX_POINTS} CR)</span>
                           </span>
@@ -375,7 +430,7 @@ export const WardFeedView: React.FC<WardFeedViewProps> = React.memo(({
           <button
             type="button"
             onClick={() => setVisibleLimit((n) => n + 6)}
-            className="min-h-[40px] px-5 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] hover:border-slate-300 dark:hover:border-white/20 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150 tabular-nums"
+            className="min-h-[40px] px-5 rounded-xl border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] hover:border-slate-500 dark:hover:border-white/20 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-[border-color,transform] duration-150 tabular-nums"
           >
             Show more ({remainingCount} remaining)
           </button>

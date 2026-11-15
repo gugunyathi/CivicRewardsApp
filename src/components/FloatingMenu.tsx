@@ -4,11 +4,11 @@ import {
   Compass,
   Layers,
   Map as MapIcon,
-  MessageSquareText,
   Plus,
   User,
   X,
 } from 'lucide-react';
+import { AiAssistantIcon } from './AiAssistantIcon';
 
 interface FloatingMenuProps {
   emergencyMode: boolean;
@@ -61,7 +61,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = React.memo(({
     },
     {
       label: 'Civic Assistant',
-      icon: MessageSquareText,
+      icon: AiAssistantIcon,
       onClick: () => {
         setExpanded(false);
         onOpenAssistant();

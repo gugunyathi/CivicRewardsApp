@@ -4,12 +4,15 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Award,
   Camera,
+  Check,
   CheckCircle2,
   ChevronDown,
   FileWarning,
   Loader2,
   LocateFixed,
+  LogIn,
   MapPin,
   ShieldAlert,
   ShieldCheck,
@@ -45,8 +48,9 @@ interface ReportFormModalProps {
   onClose: () => void;
   onSubmitNewReport: (report: CivicReport, rewardPoints: number) => void;
   onCorroborateExisting: (reportId: string) => void;
+  onViewInFeed?: (reportId: string) => void;
+  onGoToProfileSignIn?: () => void;
   signedIn: boolean;
-  onRequireAuth: () => void;
 }
 
 const SAMPLE_TEST_MEDIA = [
@@ -206,6 +210,26 @@ const QUICK_FAULT_PRESETS: Record<
       severity: 'MODERATE',
     },
   ],
+  sanitation: [
+    {
+      label: 'Sewer manhole overflow',
+      title: 'Blocked municipal sewer manhole overflowing',
+      detail: 'Raw sewage spilling onto residential roadway and stormwater kerb.',
+      severity: 'CRITICAL',
+    },
+    {
+      label: 'Blocked sewer line',
+      title: 'Main municipal sewer line backing up into properties',
+      detail: 'Urgent high-pressure sewer jetting and vacuum truck required.',
+      severity: 'HIGH',
+    },
+    {
+      label: 'Pump station fault',
+      title: 'Sewer pump station alarm / overflow',
+      detail: 'Continuous foul odour and surcharge around sanitation pump station.',
+      severity: 'HIGH',
+    },
+  ],
   parks: [
     {
       label: 'Fallen tree blocking road',
@@ -264,11 +288,18 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   onClose,
   onSubmitNewReport,
   onCorroborateExisting,
+  onViewInFeed,
+  onGoToProfileSignIn,
   signedIn,
-  onRequireAuth,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [transitionDir, setTransitionDir] = useState<'forward' | 'back'>('forward');
+  const [submittedReceipt, setSubmittedReceipt] = useState<{
+    report: CivicReport;
+    earnedPoints: number;
+    potentialPoints: number;
+    tierLabel: string;
+  } | null>(null);
 
   // Step 1: Intro & Reporter Info
   const [reporterName, setReporterName] = useState('');
@@ -303,6 +334,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   const [forensics, setForensics] = useState<ForensicAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [addedMeTooIds, setAddedMeTooIds] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const swipeRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
@@ -333,17 +365,25 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       setPinCoords({ lat: activeWard.lat, lng: activeWard.lng });
       setIsEmergency(emergencyMode);
       setSeverity(emergencyMode ? 'CRITICAL' : 'MODERATE');
+      setSubmittedReceipt(null);
+      setAddedMeTooIds({});
     }
   }, [isOpen, initialCategoryId, activeWard, emergencyMode]);
 
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (submittedReceipt && onViewInFeed) {
+          onViewInFeed(submittedReceipt.report.id);
+        } else {
+          onClose();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, submittedReceipt, onViewInFeed]);
 
   if (!isOpen) return null;
 
@@ -379,6 +419,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
   const mapDepartmentToCategory = (dept: string): ServiceCategoryId => {
     const d = dept.toLowerCase();
+    if (d.includes('sanit') || d.includes('sewer')) return 'sanitation';
     if (d.includes('water')) return 'water';
     if (d.includes('electric') || d.includes('power')) return 'electricity';
     if (d.includes('road')) return 'roads';
@@ -642,13 +683,15 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       return;
     }
 
-    const rewardPoints = signedIn
-      ? forensics?.authenticityStatus === 'VERIFIED'
-        ? 50
+    const potentialPoints =
+      forensics?.authenticityStatus === 'VERIFIED' ? 50 : previewUrl ? 25 : 15;
+    const tierLabel =
+      forensics?.authenticityStatus === 'VERIFIED'
+        ? 'Verified Live Capture (EXIF + GPS)'
         : previewUrl
-          ? 25
-          : 15
-      : 0;
+          ? 'Photo Evidence Attached'
+          : 'Standard Fault Submission';
+    const rewardPoints = signedIn ? potentialPoints : 0;
     const newId = `CP-2026-${Math.floor(1050 + Math.random() * 8900)}`;
 
     const parsedSuburbParts = reporterSuburb
@@ -722,12 +765,173 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
     };
 
     onSubmitNewReport(report, rewardPoints);
-    onClose();
+    setSubmittedReceipt({
+      report,
+      earnedPoints: rewardPoints,
+      potentialPoints,
+      tierLabel,
+    });
+  };
+
+  const handleDismissSubmitted = () => {
+    if (submittedReceipt && onViewInFeed) {
+      onViewInFeed(submittedReceipt.report.id);
+    } else {
+      onClose();
+    }
   };
 
   const presets = selectedDepartment ? QUICK_FAULT_PRESETS[selectedDepartment] ?? [] : [];
-  const rewardPreview = forensics?.authenticityStatus === 'VERIFIED' ? 50 : previewUrl ? 25 : 15;
+  const rewardPreview = signedIn
+    ? forensics?.authenticityStatus === 'VERIFIED'
+      ? 50
+      : previewUrl
+        ? 25
+        : 15
+    : 0;
   const progressPercent = (step / TOTAL_STEPS) * 100;
+
+  if (submittedReceipt) {
+    const { report, earnedPoints, potentialPoints, tierLabel } = submittedReceipt;
+    return (
+      <div
+        onClick={(e) => {
+          if (e.target === e.currentTarget) handleDismissSubmitted();
+        }}
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 dark:bg-slate-950/75 backdrop-blur-sm ui-backdrop-enter p-0 sm:p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="report-submitted-title"
+      >
+        <div className="w-full max-w-lg flex flex-col rounded-t-2xl sm:rounded-2xl bg-white dark:bg-[#111827] border border-slate-300 dark:border-white/[0.08] shadow-2xl overflow-hidden ui-modal-enter">
+          {/* CivicRewards Branded Top Bar */}
+          <div className="shrink-0 px-5 sm:px-6 pt-4 pb-3 border-b border-slate-300 dark:border-white/[0.08] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img
+                src="/assets/logo-mark.png"
+                alt="CivicRewards logo"
+                className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-300 dark:border-white/15 object-contain shrink-0"
+              />
+              <div className="min-w-0">
+                <div className="font-display text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                  CivicRewards
+                </div>
+                <div className="text-[11px] font-mono font-semibold text-emerald-700 dark:text-emerald-400 truncate tabular-nums">
+                  {report.id} · Ward {activeWard.wardNumber}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDismissSubmitted}
+              aria-label="Close and view live feed"
+              className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-400 cursor-pointer shrink-0 transition-colors duration-150"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Centered Report Submitted Confirmation */}
+          <div className="p-6 sm:p-7 flex flex-col items-center text-center gap-4 overflow-y-auto max-h-[78dvh]">
+            <h2
+              id="report-submitted-title"
+              className="font-display text-2xl sm:text-[26px] font-bold text-slate-900 dark:text-white tracking-tight"
+            >
+              Report Submitted!
+            </h2>
+
+            {/* Large Green Checkmark Ring */}
+            <div className="w-24 h-24 rounded-full border-[5px] border-emerald-700 dark:border-emerald-400 bg-emerald-600/12 dark:bg-emerald-400/10 flex items-center justify-center shadow-sm">
+              <Check className="w-12 h-12 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed max-w-md">
+              Your submission has been logged for{' '}
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {activeWard.municipalityCode} Ward {activeWard.wardNumber} ({report.suburb})
+              </span>{' '}
+              and routed to{' '}
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {report.assignedDepot}
+              </span>{' '}
+              &amp; {activeWard.councillor.name}.
+            </p>
+
+            {/* Report Reference Summary */}
+            <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/[0.08] bg-slate-100/80 dark:bg-white/[0.03] flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[11px] font-mono text-slate-700 dark:text-slate-300 tabular-nums">
+              <span className="font-bold text-slate-900 dark:text-white">{report.id}</span>
+              <span aria-hidden="true">·</span>
+              <span>Ref: {report.municipalRef || 'Pending'}</span>
+              <span aria-hidden="true">·</span>
+              <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                {currentCategory.shortTitle}
+              </span>
+            </div>
+
+            {/* Points Earned (Signed In) vs Missed Points Upsell (Guest) */}
+            {signedIn ? (
+              <div className="w-full p-4 rounded-2xl border border-emerald-600/50 bg-emerald-600/10 dark:bg-emerald-500/10 text-left flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-emerald-900 dark:text-emerald-300">
+                      +{earnedPoints} Civic Credits Earned
+                    </span>
+                    <span className="font-mono text-xs font-extrabold text-emerald-800 dark:text-emerald-300 tabular-nums">
+                      +{earnedPoints} CR
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-900 dark:text-emerald-200/85">
+                    {tierLabel} · Credited to your CivicRewards balance.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full p-4 rounded-2xl border border-amber-600/50 bg-amber-500/15 dark:bg-amber-500/10 text-left space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="text-sm font-bold text-amber-950 dark:text-amber-300">
+                      You could have earned +{potentialPoints} Civic Credits!
+                    </div>
+                    <p className="text-xs text-amber-950/90 dark:text-amber-100/80 leading-relaxed">
+                      Submitted as Guest (0 CR). Sign up now to earn Civic Credits for reporting faults, +1 Me Too corroborations, and verifying fixes.
+                    </p>
+                  </div>
+                </div>
+                {onGoToProfileSignIn && (
+                  <button
+                    type="button"
+                    onClick={onGoToProfileSignIn}
+                    className="w-full min-h-[40px] px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Sign Up Now to Earn Points (+{potentialPoints} CR per report)</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer Action to Live Ward Feed */}
+          <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-slate-300 dark:border-white/[0.08] flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleDismissSubmitted}
+              className="w-full min-h-[46px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150 shadow-sm"
+            >
+              <span>View Report in Live Feed</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -762,10 +966,10 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
             else if (dx < 0 && step < TOTAL_STEPS) handleNextStep();
           }
         }}
-        className="w-full max-w-xl h-[92dvh] sm:h-[650px] max-h-[94dvh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] shadow-2xl overflow-hidden ui-modal-enter overscroll-contain"
+        className="w-full max-w-xl h-[92dvh] sm:h-[650px] max-h-[94dvh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white dark:bg-[#111827] border border-slate-300 dark:border-white/[0.08] shadow-2xl overflow-hidden ui-modal-enter overscroll-contain"
       >
         {/* Slim Progress Bar at the Very Top */}
-        <div className="shrink-0 h-1.5 w-full bg-slate-200/80 dark:bg-white/[0.08]" aria-hidden="true">
+        <div className="shrink-0 h-1.5 w-full bg-slate-200 dark:bg-white/[0.08]" aria-hidden="true">
           <div
             className="h-full bg-emerald-600 dark:bg-emerald-400 transition-[width] duration-200 ease-out"
             style={{ width: `${progressPercent}%` }}
@@ -773,18 +977,18 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
         </div>
 
         {/* Clean Step Counter Header */}
-        <div className="shrink-0 px-5 sm:px-6 pt-4 pb-3 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0 text-xs text-slate-500 dark:text-slate-400">
+        <div className="shrink-0 px-5 sm:px-6 pt-4 pb-3 border-b border-slate-300 dark:border-white/[0.08] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0 text-xs text-slate-600 dark:text-slate-400">
             <img
               src="/assets/logo-mark.png"
               alt="CivicRewards logo"
-              className="w-7 h-7 rounded-lg bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+              className="w-7 h-7 rounded-lg bg-white p-0.5 border border-slate-300 dark:border-white/15 object-contain shrink-0"
             />
-            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums whitespace-nowrap">
+            <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums whitespace-nowrap">
               Step {step} of {TOTAL_STEPS}
             </span>
             <span aria-hidden="true">·</span>
-            <span className="truncate">
+            <span className="truncate font-medium text-slate-700 dark:text-slate-300">
               Ward {activeWard.wardNumber} ({activeWard.suburbs[0]})
             </span>
           </div>
@@ -793,7 +997,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close report wizard"
-            className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-500 dark:text-slate-400 cursor-pointer shrink-0 transition-colors duration-150"
+            className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-400 cursor-pointer shrink-0 transition-colors duration-150"
           >
             <X className="w-5 h-5" />
           </button>
@@ -802,10 +1006,10 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
         {/* Conversational Step Viewport */}
         <div className="flex-1 p-5 sm:p-6 overflow-y-auto overscroll-contain flex flex-col justify-between gap-4">
           {isEmergency && (
-            <div className="shrink-0 px-3.5 py-2.5 rounded-xl bg-red-600/10 border border-red-500/30 flex items-center justify-between gap-2 text-xs text-red-700 dark:text-red-300">
+            <div className="shrink-0 px-3.5 py-2.5 rounded-xl bg-red-600/10 border border-red-600/40 flex items-center justify-between gap-2 text-xs text-red-800 dark:text-red-300">
               <div className="flex items-center gap-1.5 min-w-0">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span className="truncate font-medium">Emergency SOS priority active</span>
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-700 dark:text-red-400" />
+                <span className="truncate font-semibold">Emergency SOS priority active</span>
               </div>
               <button
                 type="button"
@@ -820,9 +1024,9 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
           {validationError && (
             <div
               role="alert"
-              className="shrink-0 px-3.5 py-2.5 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs font-medium text-red-700 dark:text-red-200 flex items-center gap-2"
+              className="shrink-0 px-3.5 py-2.5 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-400 dark:border-red-800 text-xs font-medium text-red-800 dark:text-red-200 flex items-center gap-2"
             >
-              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-700 dark:text-red-400" />
               <span>{validationError}</span>
             </div>
           )}
@@ -843,8 +1047,10 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   >
                     Hi there! Who is reporting this issue today?
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    Used to log your ward ticket and credit Civic Rewards.
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    {signedIn
+                      ? 'Used to log your ward ticket and credit Civic Rewards.'
+                      : 'Submitting as Guest (0 CR). Sign in on Profile anytime to earn Civic Credits.'}
                   </p>
                 </div>
 
@@ -852,9 +1058,9 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   <div>
                     <label
                       htmlFor="wizard-reporter-name"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                      className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
                     >
-                      Your Name <span className="text-red-500">*</span>
+                      Your Name <span className="text-red-600">*</span>
                     </label>
                     <input
                       id="wizard-reporter-name"
@@ -867,16 +1073,16 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       onKeyDown={handleEnterAdvance}
                       placeholder="e.g. Sipho Ndlovu"
                       autoComplete="name"
-                      className="w-full h-12 px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/25 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
+                      className="w-full h-12 px-3.5 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm text-slate-950 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
                     />
                   </div>
 
                   <div>
                     <label
                       htmlFor="wizard-reporter-suburb"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                      className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
                     >
-                      Street Address (Street and Suburb) <span className="text-red-500">*</span>
+                      Street Address (Street and Suburb) <span className="text-red-600">*</span>
                     </label>
                     <input
                       id="wizard-reporter-suburb"
@@ -889,12 +1095,12 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       onKeyDown={handleEnterAdvance}
                       placeholder="Kingfisher Dr, Fourways, Sandton, 2055"
                       autoComplete="street-address"
-                      className="w-full h-12 px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/25 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
+                      className="w-full h-12 px-3.5 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm text-slate-950 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
                     />
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+                <p className="text-[11px] text-slate-600 dark:text-slate-500 font-mono">
                   Press Enter to continue.
                 </p>
               </div>
@@ -916,9 +1122,9 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   <div>
                     <label
                       htmlFor="wizard-department"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                      className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
                     >
-                      Department <span className="text-red-500">*</span>
+                      Department <span className="text-red-600">*</span>
                     </label>
                     <div className="relative">
                       <select
@@ -930,7 +1136,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                           if (val) setCategoryId(val);
                           if (validationError) setValidationError(null);
                         }}
-                        className="w-full h-12 pl-3.5 pr-10 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white appearance-none focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/25 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150 cursor-pointer"
+                        className="w-full h-12 pl-3.5 pr-10 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm text-slate-950 dark:text-white appearance-none focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150 cursor-pointer"
                       >
                         <option value="">Select a department</option>
                         {actionableCategories.map((cat) => (
@@ -939,7 +1145,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                           </option>
                         ))}
                       </select>
-                      <ChevronDown className="w-4 h-4 text-slate-400 pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
+                      <ChevronDown className="w-4 h-4 text-slate-700 dark:text-slate-400 pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
                     </div>
 
                     {!selectedDepartment && suggestedCategory && (
@@ -950,44 +1156,60 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                           setCategoryId(suggestedCategory.id);
                           setValidationError(null);
                         }}
-                        className="mt-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                        className="mt-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                       >
                         Quick pick: {suggestedCategory.title}
                       </button>
                     )}
                   </div>
 
-                  {nearbyDuplicate && (
-                    <div className="p-3 rounded-xl border border-amber-400/40 bg-amber-500/10 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 dark:text-amber-300">
-                          <Users className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">
-                            {nearbyDuplicate.clusteredHouseholds} Neighbours already logged{' '}
-                            {currentCategory.shortTitle}
-                          </span>
+                  {nearbyDuplicate && (() => {
+                    const isMeTooAdded = Boolean(addedMeTooIds[nearbyDuplicate.id]);
+                    return (
+                      <div className="p-3 rounded-xl border border-amber-500/50 bg-amber-500/10 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 dark:text-amber-300">
+                            <Users className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate tabular-nums">
+                              {nearbyDuplicate.clusteredHouseholds} Neighbours already logged{' '}
+                              {currentCategory.shortTitle}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-amber-800 dark:text-amber-200/80 truncate">
+                            {nearbyDuplicate.title} · {nearbyDuplicate.address}
+                          </p>
                         </div>
-                        <p className="text-[10px] text-amber-700 dark:text-amber-200/80 truncate">
-                          {nearbyDuplicate.title} · {nearbyDuplicate.address}
-                        </p>
+                        <button
+                          type="button"
+                          disabled={isMeTooAdded}
+                          onClick={() => {
+                            if (isMeTooAdded) return;
+                            onCorroborateExisting(nearbyDuplicate.id);
+                            setAddedMeTooIds((prev) => ({ ...prev, [nearbyDuplicate.id]: true }));
+                          }}
+                          className={`shrink-0 min-h-[36px] px-3 rounded-lg text-white text-[11px] font-semibold flex items-center gap-1.5 transition-[background-color,transform] duration-150 ${
+                            isMeTooAdded
+                              ? 'bg-emerald-600 cursor-default'
+                              : 'bg-amber-600 hover:bg-amber-700 cursor-pointer active:scale-[0.98]'
+                          }`}
+                        >
+                          {isMeTooAdded ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 stroke-[2.75]" />
+                              <span>Me Too Added</span>
+                            </>
+                          ) : (
+                            <span>+1 Me Too</span>
+                          )}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onCorroborateExisting(nearbyDuplicate.id);
-                          onClose();
-                        }}
-                        className="shrink-0 min-h-[36px] px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold cursor-pointer active:scale-[0.98] transition-transform duration-150"
-                      >
-                        +1 Me Too
-                      </button>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <div>
                     <label
                       htmlFor="wizard-problem-description"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                      className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
                     >
                       Problem Description
                     </label>
@@ -997,13 +1219,13 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Describe the issue (e.g. Water gushing across left lane, active for 6 hours, hazard to vehicles)"
-                      className="w-full p-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/25 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
+                      className="w-full p-3.5 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm text-slate-950 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
                     />
                   </div>
 
                   {presets.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                         Quick {currentCategory.shortTitle} presets:
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -1019,10 +1241,10 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                                 setSeverity(preset.severity);
                                 if (preset.severity === 'CRITICAL') setIsEmergency(true);
                               }}
-                              className={`px-3 py-1.5 rounded-lg border text-[11px] font-medium cursor-pointer active:scale-[0.98] transition-[border-color,background-color,transform] duration-150 ${
+                              className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold cursor-pointer active:scale-[0.98] transition-[border-color,background-color,transform] duration-150 ${
                                 active
-                                  ? 'border-emerald-600 bg-emerald-600 text-white'
-                                  : 'border-slate-200/80 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-slate-700 dark:text-slate-200 hover:border-emerald-600/60'
+                                  ? 'border-emerald-700 bg-emerald-600 text-white'
+                                  : 'border-slate-300 dark:border-white/12 bg-slate-50 dark:bg-white/[0.04] text-slate-800 dark:text-slate-200 hover:border-emerald-700/70'
                               }`}
                             >
                               {preset.label}
@@ -1042,7 +1264,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                 <div className="space-y-3 shrink-0">
                   <h2
                     id="report-modal-title"
-                    className="font-display text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight text-balance"
+                    className="font-display text-xl sm:text-2xl font-bold text-slate-950 dark:text-white tracking-tight text-balance"
                   >
                     Where is this happening?
                   </h2>
@@ -1050,7 +1272,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   <div>
                     <label
                       htmlFor="wizard-exact-location"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                      className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
                     >
                       Street Address / Intersection / Landmark
                     </label>
@@ -1062,7 +1284,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                         onChange={(e) => setAddress(e.target.value)}
                         onKeyDown={handleEnterAdvance}
                         placeholder="e.g. Corner of Witkoppen Rd & Leslie Ave"
-                        className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/25 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
+                        className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm text-slate-950 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
                       />
                       <button
                         type="button"
@@ -1124,13 +1346,13 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
                 {/* 1-Tap Ward Corridor Quick Chips */}
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-                  <span className="text-[11px] font-mono text-slate-400 shrink-0">Corridors:</span>
+                  <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400 shrink-0 font-semibold">Corridors:</span>
                   {activeWard.corridors.map((street) => (
                     <button
                       key={street}
                       type="button"
                       onClick={() => setAddress(`${street}, ${activeWard.suburbs[0]}`)}
-                      className="px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] hover:border-emerald-600/60 text-[11px] text-slate-700 dark:text-slate-200 whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                      className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-white/12 bg-slate-50 dark:bg-white/[0.04] hover:border-emerald-700 text-[11px] font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap shrink-0 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                     >
                       {street}
                     </button>
@@ -1145,11 +1367,11 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                 <div className="space-y-2">
                   <h2
                     id="report-modal-title"
-                    className="font-display text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight text-balance"
+                    className="font-display text-xl sm:text-2xl font-bold text-slate-950 dark:text-white tracking-tight text-balance"
                   >
                     Have you already logged this with the city?
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                     Only if you already logged this with the department yourself — leave blank otherwise. Looks like CPWEB5012172 or JWAPP-40128554.
                   </p>
                 </div>
@@ -1158,7 +1380,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   <div>
                     <label
                       htmlFor="wizard-municipal-ref"
-                      className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                      className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
                     >
                       Municipal Reference Number
                     </label>
@@ -1169,7 +1391,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       onChange={(e) => setMunicipalRef(e.target.value)}
                       onKeyDown={handleEnterAdvance}
                       placeholder="Enter your ref number"
-                      className="w-full h-12 px-3.5 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-sm font-mono tabular-nums text-slate-900 dark:text-white placeholder:font-sans placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/25 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
+                      className="w-full h-12 px-3.5 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm font-mono tabular-nums text-slate-950 dark:text-white placeholder:font-sans placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
                     />
                   </div>
 
@@ -1179,9 +1401,9 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       setMunicipalRef('');
                       goToStep(5);
                     }}
-                    className="w-full h-12 px-4 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] hover:border-emerald-600/60 hover:bg-emerald-600/10 text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-[border-color,background-color,transform] duration-150"
+                    className="w-full h-12 px-4 rounded-xl border border-slate-400 dark:border-white/12 bg-slate-50 dark:bg-white/[0.04] hover:border-emerald-700 hover:bg-emerald-600/10 text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-[border-color,background-color,transform] duration-150"
                   >
-                    <SkipForward className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <SkipForward className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                     <span>Skip / No Ref Number</span>
                   </button>
                 </div>
@@ -1190,16 +1412,16 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowRefGuide((v) => !v)}
-                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                    className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                   >
                     {showRefGuide ? 'Hide depot reference guide' : 'How do I get my official ref?'}
                   </button>
                   {showRefGuide && (
-                    <ol className="mt-2 text-xs text-slate-600 dark:text-slate-300 space-y-1.5 list-decimal list-inside rounded-xl bg-slate-50/70 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/[0.08] p-3.5">
+                    <ol className="mt-2 text-xs text-slate-700 dark:text-slate-300 space-y-1.5 list-decimal list-inside rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.08] p-3.5">
                       {refGuidance.steps.map((s, i) => (
                         <li key={i}>{s}</li>
                       ))}
-                      <li className="font-mono text-[11px] text-slate-400 pt-1">
+                      <li className="font-mono text-[11px] text-slate-600 dark:text-slate-400 pt-1">
                         {refGuidance.depot} · {refGuidance.entityHandle} · {refGuidance.slaHours}h SLA
                       </li>
                     </ol>
@@ -1215,16 +1437,18 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   <div className="flex items-center justify-between gap-2">
                     <h2
                       id="report-modal-title"
-                      className="font-display text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight text-balance"
+                      className="font-display text-xl sm:text-2xl font-bold text-slate-950 dark:text-white tracking-tight text-balance"
                     >
-                      Want to earn +50 Bonus Credits?
+                      {signedIn ? 'Want to earn +50 Bonus Credits?' : 'Add Photo or Video Evidence'}
                     </h2>
-                    <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 shrink-0 tabular-nums">
-                      +{rewardPreview} CR
+                    <span className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400 shrink-0 tabular-nums">
+                      {signedIn ? `+${rewardPreview} CR` : 'Guest · 0 CR'}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    Add a quick photo or video of the issue to verify your report and boost your rewards.
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    {signedIn
+                      ? 'Add a quick photo or video of the issue to verify your report and boost your rewards.'
+                      : 'Add a quick photo or video of the issue. Sign in on Profile to earn Civic Credits.'}
                   </p>
                 </div>
 
@@ -1284,7 +1508,9 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                             )}
                             <span>
                               {forensics.authenticityStatus === 'VERIFIED'
-                                ? 'Verified Live Capture (+50 CR)'
+                                ? signedIn
+                                  ? 'Verified Live Capture (+50 CR)'
+                                  : 'Verified Live Capture (Guest)'
                                 : forensics.authenticityStatus === 'FLAGGED_SYNTHETIC'
                                   ? 'Synthetic Media Blocked'
                                   : 'Metadata Stripped (Manual Review)'}
@@ -1310,17 +1536,19 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       const dropped = e.dataTransfer.files?.[0];
                       if (dropped) void handleFileSelected(dropped);
                     }}
-                    className="flex-1 min-h-[170px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/15 bg-slate-50/70 dark:bg-white/[0.03] p-5 flex flex-col items-center justify-center text-center gap-3"
+                    className="flex-1 min-h-[170px] rounded-2xl border-2 border-dashed border-slate-400 dark:border-white/15 bg-slate-50 dark:bg-white/[0.03] p-5 flex flex-col items-center justify-center text-center gap-3"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-emerald-600/10 border border-emerald-600/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-600/15 border border-emerald-700/35 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
                       <Camera className="w-6 h-6" />
                     </div>
                     <div className="space-y-1 max-w-xs">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                      <div className="text-sm font-semibold text-slate-950 dark:text-white">
                         Upload photo or video evidence
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Verified photo earns +50 CR · Text-only earns +15 CR.
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        {signedIn
+                          ? 'Verified photo earns +50 CR · Text-only earns +15 CR.'
+                          : 'Guest report earns 0 CR · Sign in on Profile to earn Civic Credits.'}
                       </p>
                     </div>
                     <button
@@ -1334,23 +1562,23 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   </div>
                 )}
 
-                <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/80 dark:border-white/[0.08]">
+                <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-300 dark:border-white/[0.08]">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> Sample:
+                    <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 flex items-center gap-1 font-semibold">
+                      <Sparkles className="w-3 h-3 text-emerald-700 dark:text-emerald-400" /> Sample:
                     </span>
                     {SAMPLE_TEST_MEDIA.map((sample) => (
                       <button
                         key={sample.id}
                         type="button"
                         onClick={() => void handleLoadSample(sample)}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-white/12 bg-white dark:bg-white/[0.04] hover:border-emerald-600/60 text-[11px] font-medium text-slate-700 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                        className="px-2.5 py-1 rounded-lg border border-slate-400 dark:border-white/12 bg-white dark:bg-white/[0.04] hover:border-emerald-700 text-[11px] font-semibold text-slate-800 dark:text-slate-200 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                       >
                         {sample.label}
                       </button>
                     ))}
                   </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 font-mono truncate">
                     {reporterName.trim() || 'Reporter'} · {currentCategory.shortTitle}
                   </div>
                 </div>
@@ -1360,12 +1588,12 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
         </div>
 
         {/* Pinned Conversational Footer: Back & Next / Submit Report */}
-        <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-3">
+        <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-slate-300 dark:border-white/[0.08] flex items-center justify-between gap-3">
           <button
             type="button"
             disabled={step === 1}
             onClick={handlePrevStep}
-            className="min-h-[44px] px-4 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
+            className="min-h-[44px] px-4 rounded-xl border border-slate-400 dark:border-white/12 text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>

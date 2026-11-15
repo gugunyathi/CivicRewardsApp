@@ -42,7 +42,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = React.memo(({
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-16 pb-safe bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md border-t border-slate-200/80 dark:border-white/[0.08]"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-16 pb-safe bg-white/95 dark:bg-[#0B0F17]/90 backdrop-blur-md border-t border-slate-300 dark:border-white/[0.08]"
     >
       <div className="grid grid-cols-5 h-full items-center max-w-lg mx-auto px-1">
         {tabs.map((tab) => {
@@ -56,8 +56,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = React.memo(({
               onClick={() => onSelectView(tab.id)}
               className={`min-h-[44px] rounded-xl flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-[0.95] transition-[transform,color] duration-150 ${
                 active
-                  ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                  : 'text-slate-500 dark:text-slate-400'
+                  ? 'text-emerald-700 dark:text-emerald-400 font-bold'
+                  : 'text-slate-700 dark:text-slate-400 font-medium'
               }`}
             >
               <Icon className="w-5 h-5" />

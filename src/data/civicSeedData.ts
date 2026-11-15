@@ -18,6 +18,7 @@ import imgPipeBurst from '../assets/images/evidence_pipe_burst_1794565148729.jpg
 import imgSinkhole from '../assets/images/evidence_synthetic_sinkhole_1794565149966.jpg';
 import imgRoads from '../assets/images/cat_roads_1794569473828.jpg';
 import imgSafety from '../assets/images/cat_safety_1794569475154.jpg';
+import imgSanitation from '../assets/images/cat_sanitation_1794734556013.jpg';
 import imgStreetlights from '../assets/images/cat_streetlights_1794569474617.jpg';
 import imgSubstation from '../assets/images/evidence_substation_trip_1794565149490.jpg';
 import imgTrafficSignal from '../assets/images/evidence_traffic_signal_1794565149264.jpg';
@@ -30,6 +31,7 @@ import imgDayNotices from '../assets/images/day_notices_1794687554737.jpg';
 import imgDayParks from '../assets/images/day_parks_1794687552194.jpg';
 import imgDayRoads from '../assets/images/day_roads_1794687551530.jpg';
 import imgDaySafety from '../assets/images/day_safety_1794687553838.jpg';
+import imgDaySanitation from '../assets/images/day_sanitation_1794734555495.jpg';
 import imgDayStreetlights from '../assets/images/day_streetlights_1794687551861.jpg';
 import imgDayWaste from '../assets/images/day_waste_1794687552008.jpg';
 import imgDayWater from '../assets/images/day_water_1794687550175.jpg';
@@ -388,10 +390,10 @@ export const SEED_WARDS: WardRecord[] = [
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'water',
-    title: 'Water & Sanitation',
-    shortTitle: 'Water',
+    title: 'Water Supply & Burst Mains',
+    shortTitle: 'WATER',
     entity: 'Joburg Water / Metro Water',
-    description: 'Burst mains, low pressure, sewer overflows',
+    description: 'Burst water mains, low pressure & dry taps',
     refHint: 'JWAPP-40128554',
     slaHours: 24,
     imageUrl: imgWater,
@@ -400,7 +402,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'electricity',
     title: 'Electricity & Power Outages',
-    shortTitle: 'Electricity',
+    shortTitle: 'ELECTRICITY',
     entity: 'City Power / Eskom',
     description: 'Tripped substations, outages & feeder faults',
     refHint: 'CPWEB5012172',
@@ -409,9 +411,31 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     dayImageUrl: imgDayElectricity,
   },
   {
+    id: 'waste',
+    title: 'Refuse Collection & Dumping',
+    shortTitle: 'REFUSE',
+    entity: 'Pikitup / Solid Waste',
+    description: 'Missed refuse rounds & illegal dumping sites',
+    refHint: 'PKT-334912',
+    slaHours: 48,
+    imageUrl: imgWaste,
+    dayImageUrl: imgDayWaste,
+  },
+  {
+    id: 'sanitation',
+    title: 'Sanitation & Sewer Networks',
+    shortTitle: 'SANITATION',
+    entity: 'Joburg Water Sanitation / Metro Sewer',
+    description: 'Sewer overflows, blocked manholes & pump stations',
+    refHint: 'JWAPP-SAN-4019',
+    slaHours: 12,
+    imageUrl: imgSanitation,
+    dayImageUrl: imgDaySanitation,
+  },
+  {
     id: 'roads',
     title: 'Roads, Potholes & Stormwater',
-    shortTitle: 'Roads',
+    shortTitle: 'ROADS',
     entity: 'JRA / Municipal Roads',
     description: 'Potholes, sinkholes & blocked stormwater drains',
     refHint: 'JRA-2026-9182',
@@ -421,8 +445,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   },
   {
     id: 'streetlights',
-    title: 'Streetlights & Traffic Signals',
-    shortTitle: 'Signals',
+    title: 'Signals & Street Lighting',
+    shortTitle: 'SIGNALS & LIGHTING',
     entity: 'JRA Signals / Metro Lighting',
     description: 'Out traffic intersections & dark streetlamps',
     refHint: 'TSH-882910',
@@ -431,20 +455,9 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     dayImageUrl: imgDayStreetlights,
   },
   {
-    id: 'waste',
-    title: 'Waste, Refuse & Illegal Dumping',
-    shortTitle: 'Waste',
-    entity: 'Pikitup / Solid Waste',
-    description: 'Missed refuse rounds & illegal dumping sites',
-    refHint: 'PKT-334912',
-    slaHours: 48,
-    imageUrl: imgWaste,
-    dayImageUrl: imgDayWaste,
-  },
-  {
     id: 'parks',
     title: 'Parks, Fallen Trees & Verges',
-    shortTitle: 'Parks',
+    shortTitle: 'PARKS',
     entity: 'City Parks & Zoo',
     description: 'Fallen branches, overgrown verges & parks',
     refHint: 'JCP-194022',
@@ -455,7 +468,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'safety',
     title: 'Metro Police, Bylaws & Safety',
-    shortTitle: 'Safety',
+    shortTitle: 'SAFETY',
     entity: 'JMPD / Metro Police',
     description: 'Traffic hazards, bylaw enforcement & cable theft',
     refHint: 'JMPD-77401',
@@ -465,8 +478,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   },
   {
     id: 'accounts',
-    title: 'Municipal Accounts & Debt Relief',
-    shortTitle: 'Billing',
+    title: 'Municipal Billing & Debt Relief',
+    shortTitle: 'BILLING',
     entity: 'Revenue & Credit Control',
     description: 'Smart meter readings, billing & indigent relief',
     refHint: 'ACC-900412881',
@@ -478,7 +491,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'anticorruption',
     title: 'Anti-Corruption & Whistleblowing',
-    shortTitle: 'Integrity',
+    shortTitle: 'INTEGRITY',
     entity: 'GFIS / Integrity Unit',
     description: 'Zero-identity encrypted integrity reporting',
     refHint: 'GFIS-ANON',
@@ -490,7 +503,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'notices',
     title: 'Public Notices, Legal & Voter Info',
-    shortTitle: 'Notices',
+    shortTitle: 'NOTICES',
     entity: 'Municipal Gazette & IEC',
     description: 'Planned shutdowns, bylaws & IEC voter checks',
     refHint: 'NOTICE-2026',

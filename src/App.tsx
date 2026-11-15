@@ -36,9 +36,9 @@ import type {
 
 export default function App() {
   const [activeView, setActiveView] = useState<AppView>('hub');
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [emergencyMode, setEmergencyMode] = useState(false);
-  const [cardTimeMode, setCardTimeMode] = useState<CardTimeMode>(() => getSastTimeOfDay());
+  const [cardTimeMode, setCardTimeMode] = useState<CardTimeMode>('am');
   const lastSastPeriodRef = useRef<CardTimeMode>(getSastTimeOfDay());
 
   useEffect(() => {
@@ -71,9 +71,10 @@ export default function App() {
   const [role, setRole] = useState<UserRole>(() => {
     try {
       const saved = localStorage.getItem('civicpulse_user_role');
-      return saved === 'councillor' ? 'councillor' : 'resident';
+      if (saved === 'resident' || saved === 'councillor') return saved;
+      return 'councillor';
     } catch {
-      return 'resident';
+      return 'councillor';
     }
   });
 
@@ -114,6 +115,8 @@ export default function App() {
   });
 
   const [reports, setReports] = useState<CivicReport[]>(SEED_REPORTS);
+  const [liveWard115Reports, setLiveWard115Reports] = useState<CivicReport[]>([]);
+  const [focusedFeedReportId, setFocusedFeedReportId] = useState<string | null>(null);
   const [verifiedFixIds, setVerifiedFixIds] = useState<string[]>([]);
   const [socialItems, setSocialItems] = useState<SocialPulseItem[]>(SEED_SOCIAL_PULSE);
   const [transactions, setTransactions] = useState<RewardTransaction[]>(SEED_REWARD_TRANSACTIONS);
@@ -127,6 +130,44 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    const fetchWard115Feed = () => {
+      fetch('/api/ward115/map')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (cancelled || !data || !Array.isArray(data.pins)) return;
+          setLiveWard115Reports(data.pins as CivicReport[]);
+        })
+        .catch(() => {
+          // keep local seed reports on transient network error
+        });
+    };
+    fetchWard115Feed();
+    const timer = window.setInterval(fetchWard115Feed, 90_000);
+    window.addEventListener('focus', fetchWard115Feed);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', fetchWard115Feed);
+    };
+  }, []);
+
+  const mergedReports = useMemo(() => {
+    const byId = new Map<string, CivicReport>();
+    for (const r of liveWard115Reports) {
+      byId.set(r.id, r);
+    }
+    for (const r of reports) {
+      byId.set(r.id, r);
+    }
+    return Array.from(byId.values()).sort((a, b) => {
+      const ta = new Date(a.createdAtIso).getTime() || 0;
+      const tb = new Date(b.createdAtIso).getTime() || 0;
+      return tb - ta;
+    });
+  }, [reports, liveWard115Reports]);
+
+  useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
@@ -134,9 +175,11 @@ export default function App() {
     if (!profile || !profile.name) return;
     try {
       localStorage.setItem('civic_profile', JSON.stringify(profile));
+      localStorage.setItem('civicpulse_user_role', 'resident');
     } catch {
       // private mode
     }
+    setRole('resident');
     setUser((prev) => ({
       ...prev,
       name: profile.name || prev.name,
@@ -198,8 +241,8 @@ export default function App() {
   const requireAuth = useCallback(
     (action: string): boolean => {
       if (user.signedIn) return true;
-      setAuthModalOpen(true);
-      setToastMessage('Sign in to ' + action + '.');
+      setActiveView('profile');
+      setToastMessage('Sign in on your Profile page to ' + action + '.');
       return false;
     },
     [user.signedIn]
@@ -252,6 +295,12 @@ export default function App() {
   const handleSubmitNewReport = useCallback(
     (newReport: CivicReport, rewardPoints: number) => {
       setReports((prev) => [newReport, ...prev]);
+      setRole('resident');
+      try {
+        localStorage.setItem('civicpulse_user_role', 'resident');
+      } catch {
+        // ignore storage restrictions
+      }
       if (user.signedIn && rewardPoints > 0) {
         pushReward(
           newReport.forensics.status === 'VERIFIED' ? 'Verified Live Capture Report' : 'Civic Fault Logged',
@@ -289,6 +338,33 @@ export default function App() {
       return true;
     },
     [requireAuth, pushReward]
+  );
+
+  const handleInlineCorroborateFromWizard = useCallback(
+    (reportId: string) => {
+      const incrementReport = (list: CivicReport[]) =>
+        list.map((r) =>
+          r.id === reportId
+            ? {
+                ...r,
+                clusteredHouseholds: r.clusteredHouseholds + 1,
+                escalationLog: [
+                  ...r.escalationLog,
+                  'Resident added +1 Me Too while filing report',
+                ],
+              }
+            : r
+        );
+      setReports(incrementReport);
+      setLiveWard115Reports(incrementReport);
+      if (user.signedIn) {
+        pushReward('Neighbor Outage Corroboration', `Linked household to ${reportId}`, 15);
+        setToastMessage(`Added Me Too to ${reportId} (+15 Civic Credits)`);
+      } else {
+        setToastMessage(`Added Me Too to ${reportId}`);
+      }
+    },
+    [user.signedIn, pushReward]
   );
 
   const handleVerifyResolution = useCallback(
@@ -465,6 +541,10 @@ export default function App() {
     setReportModalOpen(true);
   }, []);
   const openMap = useCallback(() => setActiveView('map'), []);
+  const openFeedReport = useCallback((reportId?: string) => {
+    setFocusedFeedReportId(reportId ?? null);
+    setActiveView('feed');
+  }, []);
   const openProfile = useCallback(() => setActiveView('profile'), []);
 
   const handleRedeemOffer = useCallback(
@@ -487,7 +567,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-dvh bg-[#F8FAFC] dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 transition-colors duration-150 flex flex-col">
+    <div className="min-h-dvh bg-[#EEF2F6] dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 transition-colors duration-150 flex flex-col">
       <TopBar
         activeView={activeView}
         onSelectView={setActiveView}
@@ -520,16 +600,18 @@ export default function App() {
               onChangeServicesLayout={handleChangeServicesLayout}
               cardTimeMode={cardTimeMode}
               onChangeCardTimeMode={setCardTimeMode}
-              reports={reports}
-              onCorroborateReport={handleCorroborateReport}
+              reports={mergedReports}
+              onOpenFeedReport={openFeedReport}
             />
           )}
 
           {activeView === 'feed' && (
             <WardFeedView
-              reports={reports}
+              reports={mergedReports}
               activeWard={activeWard}
               verifiedFixIds={verifiedFixIds}
+              focusedReportId={focusedFeedReportId}
+              onClearFocusedReport={() => setFocusedFeedReportId(null)}
               onCorroborateReport={handleCorroborateReport}
               onVerifyResolution={handleVerifyResolution}
               onOpenReportModal={openDefaultReportModal}
@@ -598,6 +680,8 @@ export default function App() {
               onVerifyResolution={handleVerifyResolution}
               onAttachRef={handleAttachRef}
               onSendSlaReminder={handleSendSlaReminder}
+              onAuthSuccess={handleAuthSuccess}
+              onSignOut={handleSignOut}
             />
           )}
         </div>
@@ -625,6 +709,7 @@ export default function App() {
         onToggleEmergency={toggleEmergency}
         onOpenAuthModal={openAuthModal}
         onOpenAssistant={openAssistant}
+        onSignOut={handleSignOut}
       />
 
       <AuthOnboardingModal
@@ -644,15 +729,20 @@ export default function App() {
         activeWard={activeWard}
         darkMode={darkMode}
         emergencyMode={emergencyMode}
-        existingReports={reports}
+        existingReports={mergedReports}
         onClose={() => setReportModalOpen(false)}
         onSubmitNewReport={handleSubmitNewReport}
-        onCorroborateExisting={handleCorroborateReport}
-        signedIn={user.signedIn}
-        onRequireAuth={() => {
-          setAuthModalOpen(true);
-          setToastMessage('Sign in to submit your report -- your draft is kept.');
+        onCorroborateExisting={handleInlineCorroborateFromWizard}
+        onViewInFeed={(reportId) => {
+          setReportModalOpen(false);
+          openFeedReport(reportId);
         }}
+        onGoToProfileSignIn={() => {
+          setReportModalOpen(false);
+          setActiveView('profile');
+          setToastMessage('Sign up or sign in on your Profile page to earn Civic Credits.');
+        }}
+        signedIn={user.signedIn}
       />
 
       <CivicAssistantDrawer

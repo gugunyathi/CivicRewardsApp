@@ -51,7 +51,15 @@ function PlatformIcon({ platform, className = 'w-4 h-4' }: { platform: InstallPl
   return <Download className={className} />;
 }
 
-export const InstallButton: React.FC<{ className?: string }> = ({ className = '' }) => {
+interface InstallButtonProps {
+  className?: string;
+  variant?: 'topbar' | 'menu';
+}
+
+export const InstallButton: React.FC<InstallButtonProps> = ({
+  className = '',
+  variant = 'topbar',
+}) => {
   const { installState, platform, triggerInstall } = useInstallPrompt();
   const [guideOpen, setGuideOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,7 +73,8 @@ export const InstallButton: React.FC<{ className?: string }> = ({ className = ''
     return () => window.removeEventListener('keydown', onKey);
   }, [guideOpen]);
 
-  if (installState === 'installed' || installState === 'unavailable') return null;
+  if (installState === 'installed') return null;
+  if (variant === 'topbar' && installState === 'unavailable') return null;
 
   const handleClick = async () => {
     if (installState === 'prompt') {
@@ -82,16 +91,33 @@ export const InstallButton: React.FC<{ className?: string }> = ({ className = ''
 
   return (
     <>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={busy}
-        title="Install CivicRewards on this device"
-        className={`min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer border border-emerald-600/30 dark:border-emerald-400/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 disabled:opacity-50 ${className}`}
-      >
-        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-        <span className="hidden sm:inline">{busy ? 'Installing…' : 'Install'}</span>
-      </button>
+      {variant === 'menu' ? (
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={busy}
+          title="Download CivicRewards App"
+          className={`w-full min-h-[42px] px-3.5 rounded-xl border border-slate-400 dark:border-white/12 hover:bg-slate-100 dark:hover:bg-white/[0.04] text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-2 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer disabled:opacity-50 ${className}`}
+        >
+          {busy ? (
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-700 dark:text-emerald-400 shrink-0" />
+          ) : (
+            <Download className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
+          )}
+          <span>{busy ? 'Downloading…' : 'Download App'}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={busy}
+          title="Install CivicRewards on this device"
+          className={`min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 active:scale-[0.98] transition-[transform,background-color] duration-150 cursor-pointer border border-emerald-700/45 dark:border-emerald-400/30 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 disabled:opacity-50 ${className}`}
+        >
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline">{busy ? 'Installing…' : 'Install'}</span>
+        </button>
+      )}
 
       {guideOpen && (
         <div
@@ -103,16 +129,16 @@ export const InstallButton: React.FC<{ className?: string }> = ({ className = ''
           aria-modal="true"
           aria-label={guide.title}
         >
-          <div className="w-full max-w-md flex flex-col bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/10 rounded-t-2xl sm:rounded-2xl shadow-xl shadow-slate-900/15 overflow-hidden ui-modal-enter overscroll-contain">
-            <div className="px-6 py-4 border-b border-slate-200/80 dark:border-white/[0.08] flex items-center justify-between gap-2">
+          <div className="w-full max-w-md flex flex-col bg-white dark:bg-[#111827] border border-slate-300 dark:border-white/10 rounded-t-2xl sm:rounded-2xl shadow-xl shadow-slate-900/15 overflow-hidden ui-modal-enter overscroll-contain">
+            <div className="px-6 py-4 border-b border-slate-300 dark:border-white/[0.08] flex items-center justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 <img
                   src="/assets/logo-mark.png"
                   alt="CivicRewards logo"
-                  className="w-9 h-9 rounded-xl bg-white p-0.5 border border-slate-200/80 dark:border-white/15 object-contain shrink-0"
+                  className="w-9 h-9 rounded-xl bg-white p-0.5 border border-slate-300 dark:border-white/15 object-contain shrink-0"
                 />
                 <div className="min-w-0">
-                  <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                  <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                     <PlatformIcon platform={platform} className="w-3 h-3" />
                     <span>Offline-ready app</span>
                   </div>
@@ -125,7 +151,7 @@ export const InstallButton: React.FC<{ className?: string }> = ({ className = ''
                 type="button"
                 onClick={() => setGuideOpen(false)}
                 aria-label="Close install guide"
-                className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-500 active:scale-95 transition-[transform,background-color] duration-150 cursor-pointer shrink-0"
+                className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center hover:bg-slate-200/70 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-400 active:scale-95 transition-[transform,background-color] duration-150 cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -133,7 +159,7 @@ export const InstallButton: React.FC<{ className?: string }> = ({ className = ''
 
             <ol className="p-6 space-y-3">
               {guide.steps.map((step, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+                <li key={i} className="flex items-start gap-3 text-sm text-slate-800 dark:text-slate-200">
                   <span className="mt-0.5 w-6 h-6 rounded-lg shrink-0 bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-mono text-xs font-bold flex items-center justify-center tabular-nums">
                     {i + 1}
                   </span>
@@ -144,13 +170,13 @@ export const InstallButton: React.FC<{ className?: string }> = ({ className = ''
 
             <div className="px-6 pb-6 space-y-3">
               {platform === 'ios' ? (
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/[0.08] text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                  <Share className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div className="p-3 rounded-xl bg-slate-100/80 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.08] text-xs text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <Share className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
                   <span>Tap the Safari Share icon at the bottom of your screen.</span>
                 </div>
               ) : (
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/[0.08] text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div className="p-3 rounded-xl bg-slate-100/80 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.08] text-xs text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
                   <span>Opens fullscreen and stays available offline.</span>
                 </div>
               )}

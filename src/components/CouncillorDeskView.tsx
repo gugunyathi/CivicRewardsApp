@@ -84,13 +84,13 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
           <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
             Councillor Escalation Desk
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+          <p className="text-xs text-slate-600 dark:text-slate-400 tabular-nums">
             {reports.length} queued · {breachedCount} SLA breached · {blockedCount} quarantined
           </p>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="font-mono text-xs text-slate-500 dark:text-slate-400 tabular-nums mr-1">
+          <span className="font-mono text-xs text-slate-600 dark:text-slate-400 tabular-nums mr-1">
             Ticket {filtered.length === 0 ? 0 : safeIdx + 1} / {filtered.length}
           </span>
           <button
@@ -98,7 +98,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
             disabled={safeIdx === 0 || filtered.length === 0}
             onClick={() => setTicketIdx((i) => Math.max(0, i - 1))}
             aria-label="Previous ticket"
-            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
+            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-800 dark:text-white disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -107,7 +107,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
             disabled={safeIdx >= filtered.length - 1 || filtered.length === 0}
             onClick={() => setTicketIdx((i) => Math.min(filtered.length - 1, i + 1))}
             aria-label="Next ticket"
-            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#111827] disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
+            className="min-h-[36px] min-w-[36px] rounded-xl flex items-center justify-center border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#111827] text-slate-800 dark:text-white disabled:opacity-35 cursor-pointer active:scale-95 transition-transform duration-150"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -115,7 +115,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] p-2.5">
+      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between rounded-2xl bg-white dark:bg-[#111827] border border-slate-300 dark:border-white/[0.08] p-2.5">
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {['ALL', ...WORKFLOW_STEPS, 'Blocked by AI Forensics'].map((st) => (
             <button
@@ -128,7 +128,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
               className={`min-h-[34px] px-3 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                 statusFilter === st
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
               }`}
             >
               {st === 'ALL' ? 'All' : st === 'Blocked by AI Forensics' ? 'Blocked' : st}
@@ -143,7 +143,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
             setTicketIdx(0);
           }}
           aria-label="Filter by Ward"
-          className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600"
+          className="h-9 px-3 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-xs font-medium text-slate-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700"
         >
           <option value="ALL">All Wards</option>
           <option value={activeWard.id}>
@@ -159,7 +159,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
 
       {/* Single-Ticket Focus Card */}
       {!currentTicket ? (
-        <div className="p-8 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] text-center text-sm text-slate-500">
+        <div className="p-8 rounded-2xl bg-white dark:bg-[#111827] border border-slate-300 dark:border-white/[0.08] text-center text-sm text-slate-600 dark:text-slate-400">
           No tickets match this filter.
         </div>
       ) : (
@@ -173,10 +173,10 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
           const wardMeta = SEED_WARDS.find((w) => w.id === report.wardId);
 
           return (
-            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/[0.08] shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-4 sm:p-5 space-y-4">
+            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-slate-300 dark:border-white/[0.08] shadow-[0_1px_2px_rgba(15,23,42,0.06)] p-4 sm:p-5 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
                 <div className="space-y-1 flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-400">
                     <span className="font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
                       {report.id}
                     </span>
@@ -187,7 +187,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                     <span aria-hidden="true">·</span>
                     <span>{wardMeta?.councillor.name ?? 'Councillor'}</span>
                     <span aria-hidden="true">·</span>
-                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">
                       {report.assignedDepot}
                     </span>
                   </div>
@@ -196,7 +196,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                     {report.title}
                   </h3>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-2">
                     {report.address} — {report.description}
                   </p>
                 </div>
@@ -214,7 +214,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                       </span>
                     )}
                     {report.forensics.status === 'FLAGGED_SYNTHETIC' && (
-                      <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <span className="text-red-700 dark:text-red-400 flex items-center gap-1">
                         <ShieldAlert className="w-3.5 h-3.5" /> Synthetic Blocked
                       </span>
                     )}
@@ -227,7 +227,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
               {/* Evidence photo + fault location map */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <div className="font-mono text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <div className="font-mono text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                     Evidence capture
                   </div>
                   <SmartImage
@@ -235,11 +235,11 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                     alt={report.title}
                     categoryId={report.categoryId}
                     label={`${report.departmentLabel} · ${report.suburb}`}
-                    className="h-32 w-full rounded-xl border border-slate-200/80 dark:border-white/[0.08]"
+                    className="h-32 w-full rounded-xl border border-slate-300 dark:border-white/[0.08]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <div className="font-mono text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <div className="font-mono text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                     Fault location
                   </div>
                   <MiniMapPreview
@@ -248,7 +248,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                     zoom={14}
                     darkMode={isDarkTheme()}
                     label={`${report.address} · ${report.lat.toFixed(3)}, ${report.lng.toFixed(3)}`}
-                    className="h-32 w-full rounded-xl border border-slate-200/80 dark:border-white/[0.08]"
+                    className="h-32 w-full rounded-xl border border-slate-300 dark:border-white/[0.08]"
                   />
                 </div>
               </div>
@@ -275,8 +275,8 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                           active
                             ? 'bg-emerald-600 border-emerald-600 text-white'
                             : done
-                              ? 'bg-emerald-600/10 border-emerald-600/30 text-emerald-700 dark:text-emerald-300'
-                              : 'bg-slate-50/70 dark:bg-white/[0.04] border-slate-200/80 dark:border-white/[0.08] text-slate-600 dark:text-slate-400 hover:border-emerald-600/60'
+                              ? 'bg-emerald-600/12 border-emerald-700/40 text-emerald-800 dark:text-emerald-300'
+                              : 'bg-slate-100/80 dark:bg-white/[0.04] border-slate-300 dark:border-white/[0.08] text-slate-700 dark:text-slate-400 hover:border-emerald-700'
                         }`}
                       >
                         {step === 'Technician Dispatched' && <Wrench className="w-3 h-3 shrink-0" />}
@@ -289,7 +289,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
               )}
 
               {/* Controls */}
-              <div className="pt-3 border-t border-slate-100 dark:border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="pt-3 border-t border-slate-200 dark:border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <input
                     type="text"
@@ -298,7 +298,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                       setRefDrafts((prev) => ({ ...prev, [report.id]: e.target.value }))
                     }
                     placeholder="Ref # (e.g. CPWEB5012)"
-                    className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 bg-slate-50/70 dark:bg-white/[0.04] text-xs font-mono text-slate-900 dark:text-white focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-600/25 focus:border-emerald-600"
+                    className="h-9 px-3 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-xs font-mono text-slate-950 dark:text-white placeholder:text-slate-500 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700"
                   />
                   <button
                     type="button"
@@ -315,7 +315,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                     <button
                       type="button"
                       onClick={() => onApproveStrippedMedia(report.id)}
-                      className="h-9 px-3 rounded-xl border border-emerald-600/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                      className="h-9 px-3 rounded-xl border border-emerald-700/60 text-emerald-800 dark:text-emerald-400 text-xs font-semibold flex items-center gap-1 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                     >
                       <FileCheck2 className="w-3.5 h-3.5" />
                       <span>Verify</span>
@@ -338,9 +338,9 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                       );
                     }}
                     title="Share report to WhatsApp"
-                    className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-white/12 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
+                    className="h-9 px-3 rounded-xl border border-slate-300 dark:border-white/12 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-[0.98] transition-transform duration-150"
                   >
-                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                     <span>WhatsApp</span>
                   </button>
 
@@ -351,7 +351,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                       className={`h-9 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150 ${
                         slaBreached
                           ? 'bg-red-600 hover:bg-red-700 text-white'
-                          : 'border border-slate-200/90 dark:border-white/12 text-slate-700 dark:text-slate-200'
+                          : 'border border-slate-300 dark:border-white/12 text-slate-800 dark:text-slate-200'
                       }`}
                     >
                       <BellRing className="w-3.5 h-3.5" />
@@ -361,7 +361,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                 </div>
               </div>
 
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5 font-mono">
+              <div className="text-[11px] text-slate-600 dark:text-slate-400 space-y-0.5 font-mono">
                 {report.escalationLog.slice(-2).map((entry, i) => (
                   <div key={i} className="truncate">
                     · {entry}

@@ -3,9 +3,10 @@ export type MunicipalityCode = 'CoJ' | 'CoCT' | 'CoT' | 'eThekwini';
 export type ServiceCategoryId =
   | 'water'
   | 'electricity'
+  | 'waste'
+  | 'sanitation'
   | 'roads'
   | 'streetlights'
-  | 'waste'
   | 'parks'
   | 'safety'
   | 'accounts'

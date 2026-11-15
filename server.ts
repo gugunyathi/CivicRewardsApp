@@ -481,6 +481,8 @@ Instructions:
     eskom: { id: 'electricity', dept: 'Electricity & Power', depot: 'Eskom Gauteng North', sla: 24 },
     roads: { id: 'roads', dept: 'Roads & Stormwater', depot: 'JRA Region A Depot', sla: 72 },
     refuse: { id: 'waste', dept: 'Waste & Dumping', depot: 'Pikitup Randburg Depot', sla: 48 },
+    sanitation: { id: 'sanitation', dept: 'Sanitation & Sewer', depot: 'Joburg Water Randburg Depot', sla: 12 },
+    sewer: { id: 'sanitation', dept: 'Sanitation & Sewer', depot: 'Joburg Water Randburg Depot', sla: 12 },
     safety: { id: 'safety', dept: 'Metro Police & Safety', depot: 'JMPD Region A', sla: 4 },
     parks: { id: 'parks', dept: 'Parks & Trees', depot: 'City Parks Region A', sla: 48 },
     billing: { id: 'accounts', dept: 'Municipal Billing', depot: 'CoJ Revenue Region A', sla: 72 },

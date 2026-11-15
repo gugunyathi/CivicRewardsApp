@@ -15,7 +15,7 @@ export const SlaCountdown: React.FC<SlaCountdownProps> = ({ report, className = 
   if (report.status === 'Resolved') {
     return (
       <span
-        className={`inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 ${className}`}
+        className={`inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 ${className}`}
       >
         <CheckCircle2 className="w-3.5 h-3.5" />
         <span>Resolved within SLA</span>
@@ -24,7 +24,7 @@ export const SlaCountdown: React.FC<SlaCountdownProps> = ({ report, className = 
   }
   if (report.status === 'Blocked by AI Forensics') {
     return (
-      <span className={`inline-flex items-center gap-1 text-xs font-mono text-slate-400 ${className}`}>
+      <span className={`inline-flex items-center gap-1 text-xs font-mono text-slate-600 dark:text-slate-400 ${className}`}>
         <Clock className="w-3.5 h-3.5" />
         <span>SLA paused (quarantined)</span>
       </span>
@@ -35,10 +35,10 @@ export const SlaCountdown: React.FC<SlaCountdownProps> = ({ report, className = 
   const breached = fraction <= 0;
   const urgent = !breached && fraction < 0.25;
   const color = breached
-    ? 'text-red-600 dark:text-red-400'
+    ? 'text-red-700 dark:text-red-400'
     : urgent
-      ? 'text-amber-600 dark:text-amber-400'
-      : 'text-slate-500 dark:text-slate-400';
+      ? 'text-amber-700 dark:text-amber-400'
+      : 'text-slate-600 dark:text-slate-400';
 
   return (
     <span

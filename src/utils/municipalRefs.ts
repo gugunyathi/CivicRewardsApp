@@ -11,6 +11,7 @@ type Dept = 'water' | 'power' | 'roads' | 'waste' | 'general';
 function deptForCategory(categoryId: ServiceCategoryId): Dept {
   switch (categoryId) {
     case 'water':
+    case 'sanitation':
       return 'water';
     case 'electricity':
     case 'streetlights':

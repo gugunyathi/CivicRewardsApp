@@ -57,8 +57,16 @@
 /* Leaflet integration tweaks for dark/light civic map theme */
 .leaflet-container {
   font-family: var(--font-sans);
-  background: #0b0f17;
+  background: #e2e8f0;
   outline: none;
+}
+html.dark .leaflet-container {
+  background: #0b0f17;
+}
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #64748b;
+  opacity: 1;
 }
 .leaflet-control-attribution {
   font-size: 9px !important;
