@@ -1,4 +1,4 @@
-import { getCouncillorAnalytics } from '../../server-store';
+import { getCouncillorAnalytics } from '../../server-store.js';
 
 export default function handler(req: any, res: any) {
   const wardId = req.query?.wardId ? String(req.query.wardId) : 'ALL';

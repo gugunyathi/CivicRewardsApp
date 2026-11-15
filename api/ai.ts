@@ -6,7 +6,7 @@ import {
   buildLocalWardTriageFallback,
   getAiCapabilitiesStatus,
   runEconomicAiWithFallback,
-} from '../server-ai';
+} from '../server-ai.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '25mb' } },

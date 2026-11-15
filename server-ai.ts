@@ -61,6 +61,12 @@ function markCooldown(provider: AiProviderId, message: string) {
   }
 }
 
+export function geminiModelIds(): { primary: string; lite: string } {
+  const primary = (process.env.GEMINI_MODEL || '').trim() || 'gemini-3.8-flash';
+  const lite = (process.env.GEMINI_LITE_MODEL || '').trim() || 'gemini-3.5-flash-lite';
+  return { primary, lite };
+}
+
 export function getAiCapabilitiesStatus() {
   const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim());
   const hasClaude = Boolean(
@@ -72,10 +78,11 @@ export function getAiCapabilitiesStatus() {
   const hasOpenAi = Boolean(process.env.OPENAI_API_KEY?.trim());
   const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
 
+  const gemini = geminiModelIds();
   const activeChain: Array<{ id: AiProviderId; model: string; tier: string }> = [];
   if (hasGemini) {
-    activeChain.push({ id: 'gemini-primary', model: 'gemini-4-hydrogen', tier: 'free-tier' });
-    activeChain.push({ id: 'gemini-lite', model: 'gemini-3.1-flash-lite', tier: 'economic' });
+    activeChain.push({ id: 'gemini-primary', model: gemini.primary, tier: 'free-tier' });
+    activeChain.push({ id: 'gemini-lite', model: gemini.lite, tier: 'economic' });
   }
   if (hasClaude) {
     activeChain.push({ id: 'claude', model: 'claude-3-5-haiku-latest', tier: 'economic' });
@@ -96,7 +103,7 @@ export function getAiCapabilitiesStatus() {
     hasGrokKey: hasGrok,
     hasOpenAiKey: hasOpenAi,
     hasOpenRouterKey: hasOpenRouter,
-    primaryModel: 'gemini-4-hydrogen',
+    primaryModel: gemini.primary,
     economicFallbacks: activeChain,
   };
 }
@@ -119,7 +126,7 @@ function parseJsonObject<T = Record<string, unknown>>(rawText: string): T {
 }
 
 async function callGemini(
-  model: 'gemini-4-hydrogen' | 'gemini-3.1-flash-lite',
+  model: string,
   options: AiRunOptions
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -300,6 +307,7 @@ export async function runEconomicAiWithFallback<T = Record<string, unknown>>(
     run: () => Promise<string>;
   }
 
+  const gemini = geminiModelIds();
   const geminiKey = Boolean(process.env.GEMINI_API_KEY?.trim());
   const claudeKey = Boolean(
     process.env.ANTHROPIC_API_KEY?.trim() || process.env.CLAUDE_API_KEY?.trim()
@@ -313,17 +321,17 @@ export async function runEconomicAiWithFallback<T = Record<string, unknown>>(
   const candidates: Candidate[] = [
     {
       id: 'gemini-primary',
-      label: 'Gemini 4 Hydrogen (Free Tier)',
-      model: 'gemini-4-hydrogen',
+      label: 'Gemini Primary (Free Tier)',
+      model: gemini.primary,
       configured: geminiKey,
-      run: () => callGemini('gemini-4-hydrogen', options),
+      run: () => callGemini(gemini.primary, options),
     },
     {
       id: 'gemini-lite',
-      label: 'Gemini 3.1 Flash-Lite',
-      model: 'gemini-3.1-flash-lite',
+      label: 'Gemini Lite',
+      model: gemini.lite,
       configured: geminiKey,
-      run: () => callGemini('gemini-3.1-flash-lite', options),
+      run: () => callGemini(gemini.lite, options),
     },
     {
       id: 'claude',

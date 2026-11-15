@@ -8,8 +8,8 @@ import {
   recordCorroboration,
   recordVerification,
   saveSubmittedReport,
-} from '../server-store';
-import type { CivicReport, MunicipalityCode, ReportStatus, ServiceCategoryId } from '../src/types/civic';
+} from '../server-store.js';
+import type { CivicReport, MunicipalityCode, ReportStatus, ServiceCategoryId } from '../src/types/civic.js';
 
 function handleIndex(req: any, res: any) {
   if (req.method === 'GET') {

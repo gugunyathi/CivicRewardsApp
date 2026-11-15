@@ -1,6 +1,6 @@
 // api/health.ts – Vercel serverless function
-import { getStoreMetrics } from '../server-store';
-import { getAiCapabilitiesStatus } from '../server-ai';
+import { getStoreMetrics } from '../server-store.js';
+import { getAiCapabilitiesStatus } from '../server-ai.js';
 
 export default function handler(_req: any, res: any) {
   res.json({

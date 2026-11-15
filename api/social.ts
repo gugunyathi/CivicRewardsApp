@@ -2,8 +2,8 @@
 // Serves: POST /api/social/link, POST /api/social/summarize
 // (see vercel.json rewrites, which map the nested paths here).
 import { Type } from '@google/genai';
-import { runEconomicAiWithFallback } from '../server-ai';
-import { recordSocialLinkEvent } from '../server-store';
+import { runEconomicAiWithFallback } from '../server-ai.js';
+import { recordSocialLinkEvent } from '../server-store.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },

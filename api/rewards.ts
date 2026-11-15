@@ -5,7 +5,7 @@ import {
   claimRewardsForMobile,
   getPendingRewardsForMobile,
   recordRewardRedemption,
-} from '../server-store';
+} from '../server-store.js';
 
 function handlePending(req: any, res: any) {
   const mobile = String(req.query?.mobile || '').trim();

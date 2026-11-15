@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { normalizeSaMobile } from './server-auth';
+import { normalizeSaMobile } from './server-auth.js';
 import type {
   CivicReport,
   CouncillorAnalyticsSummary,
@@ -10,7 +10,7 @@ import type {
   ReportStatus,
   RewardTransaction,
   ServiceCategoryId,
-} from './src/types/civic';
+} from './src/types/civic.js';
 
 interface ReportOverride {
   status?: ReportStatus;

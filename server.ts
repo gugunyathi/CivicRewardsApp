@@ -7,8 +7,8 @@ import {
   buildLocalWardTriageFallback,
   getAiCapabilitiesStatus,
   runEconomicAiWithFallback,
-} from './server-ai';
-import { registerAuthRoutes } from './server-auth';
+} from './server-ai.js';
+import { registerAuthRoutes } from './server-auth.js';
 import {
   claimRewardsForMobile,
   getCouncillorAnalytics,
@@ -21,8 +21,8 @@ import {
   recordSocialLinkEvent,
   recordVerification,
   saveSubmittedReport,
-} from './server-store';
-import type { CivicReport, MunicipalityCode, ReportStatus, ServiceCategoryId } from './src/types/civic';
+} from './server-store.js';
+import type { CivicReport, MunicipalityCode, ReportStatus, ServiceCategoryId } from './src/types/civic.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

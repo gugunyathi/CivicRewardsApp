@@ -1,8 +1,8 @@
 // api/ward.ts – consolidated Vercel serverless function.
 // Serves: GET /api/ward/summary, GET /api/ward115/map
 // (see vercel.json rewrites, which map the nested paths here).
-import { getStoreMetrics } from '../server-store';
-import type { CivicReport, ReportStatus, ServiceCategoryId } from '../src/types/civic';
+import { getStoreMetrics } from '../server-store.js';
+import type { CivicReport, ReportStatus, ServiceCategoryId } from '../src/types/civic.js';
 
 export const config = {
   api: {

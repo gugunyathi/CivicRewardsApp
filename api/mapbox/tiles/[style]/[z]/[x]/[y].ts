@@ -1,4 +1,7 @@
-// api/mapbox/tiles/[...slug].ts – Vercel serverless tile proxy
+// api/mapbox/tiles/[style]/[z]/[x]/[y].ts – Vercel serverless tile proxy
+// NOTE: explicit 4-segment dynamic route. A [...slug] catch-all file only
+// matched a single path segment on Vercel (multi-segment tile URLs 404'd),
+// so the tile path is declared segment by segment instead.
 const MAPBOX_STYLE_MAP: Record<string, { mapboxId: string; fallbackUrl: (z: number, x: number, y: number) => string }> = {
   streets: {
     mapboxId: 'mapbox/streets-v12',
@@ -20,22 +23,10 @@ const MAPBOX_STYLE_MAP: Record<string, { mapboxId: string; fallbackUrl: (z: numb
 };
 
 export default async function handler(req: any, res: any) {
-  let styleKey = '';
-  let z = -1;
-  let x = -1;
-  let y = -1;
-
-  if (Array.isArray(req.query.slug)) {
-    styleKey = String(req.query.slug[0] || '').toLowerCase();
-    z = Number.parseInt(req.query.slug[1], 10);
-    x = Number.parseInt(req.query.slug[2], 10);
-    y = Number.parseInt(req.query.slug[3], 10);
-  } else {
-    styleKey = String(req.query.style || '').toLowerCase();
-    z = Number.parseInt(req.query.z, 10);
-    x = Number.parseInt(req.query.x, 10);
-    y = Number.parseInt(req.query.y, 10);
-  }
+  const styleKey = String(req.query?.style || '').toLowerCase();
+  const z = Number.parseInt(req.query?.z, 10);
+  const x = Number.parseInt(req.query?.x, 10);
+  const y = Number.parseInt(req.query?.y, 10);
 
   const styleCfg = MAPBOX_STYLE_MAP[styleKey];
 
