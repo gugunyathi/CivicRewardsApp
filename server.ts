@@ -2,28 +2,32 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
+import {
+  buildLocalWardTriageFallback,
+  getAiCapabilitiesStatus,
+  runEconomicAiWithFallback,
+} from './server-ai';
 import { registerAuthRoutes } from './server-auth';
+import {
+  claimRewardsForMobile,
+  getCouncillorAnalytics,
+  getPendingRewardsForMobile,
+  getStoreMetrics,
+  listReports,
+  patchReportRecord,
+  recordCorroboration,
+  recordRewardRedemption,
+  recordSocialLinkEvent,
+  recordVerification,
+  saveSubmittedReport,
+} from './server-store';
+import type { CivicReport, MunicipalityCode, ReportStatus, ServiceCategoryId } from './src/types/civic';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT) || 3000;
-
-function getAiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured in Settings > Secrets.');
-  }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
-}
 
 const FORENSIC_SYSTEM_PROMPT = `You are a Municipal Civic Forensics & Triage AI. Analyze the uploaded media alongside the provided EXIF metadata (timestamp, GPS coordinates, device make/model) and user-reported address. Evaluate:
 1. Visual Authenticity: Check for AI generation artifacts, unnatural textures, impossible shadows, UI screen-capture borders, or photo manipulation.
@@ -37,23 +41,37 @@ async function createServer() {
   registerAuthRoutes(app);
 
   app.get('/api/health', (_req, res) => {
+    const metrics = getStoreMetrics();
+    const aiStatus = getAiCapabilitiesStatus();
     res.json({
       ok: true,
-      hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
       hasMapboxToken: Boolean(process.env.MAPBOX_TOKEN),
+      ...aiStatus,
+      ...metrics,
+    });
+  });
+
+  app.get('/api/ai/status', (_req, res) => {
+    res.json({
+      ok: true,
+      ...getAiCapabilitiesStatus(),
     });
   });
 
   app.get('/api/ward/summary', (req, res) => {
     const wardParam = String(req.query.ward || '115').replace(/[^0-9]/g, '') || '115';
+    const wardNum = Number(wardParam);
+    const metrics = getStoreMetrics(wardNum);
     res.json({
       ok: true,
-      ward: Number(wardParam),
+      ward: wardNum,
       municipalityCode: 'CoJ',
-      activeIncidents: 6,
-      resolvedThisMonth: 84,
+      activeIncidents: Math.max(metrics.activeIncidents, 6),
+      resolvedThisMonth: 84 + metrics.resolvedCount,
       slaComplianceScore: 92,
       totalCreditsDistributed: 28450,
+      uniqueReporterNumbers: metrics.uniqueReporters,
+      totalReporterContacts: metrics.totalReporterContacts,
       primaryDepots: {
         water: 'Joburg Water Randburg Depot',
         electricity: 'City Power Bryanston Depot',
@@ -64,77 +82,113 @@ async function createServer() {
   });
 
   app.get('/api/reports', (req, res) => {
-    const ward = req.query.ward ? String(req.query.ward).toLowerCase() : null;
-    const status = req.query.status ? String(req.query.status).toLowerCase() : null;
+    const ward = req.query.ward ? String(req.query.ward) : null;
+    const status = req.query.status ? String(req.query.status) : null;
+    const category = req.query.category ? String(req.query.category) : null;
+    const q = req.query.q ? String(req.query.q) : null;
+    const includeContacts = req.query.role === 'councillor' || req.query.includeContacts === 'true';
 
-    // Return current server-authoritative mock reports snapshot
-    const serverReports = [
-      {
-        id: 'CP-2026-1041',
-        wardId: 'CoJ-115',
-        municipalityCode: 'CoJ',
-        wardNumber: 115,
-        suburb: 'Fourways',
-        categoryId: 'water',
-        departmentLabel: 'Joburg Water',
-        title: 'High-pressure 250mm water main burst on Cedar Rd',
-        address: 'Cedar Rd & Campbell Rd, Fourways, Sandton',
-        status: 'Escalated to Depot',
-        severity: 'CRITICAL',
-        isEmergency: true,
-        clusteredHouseholds: 38,
-        createdAtIso: '2026-03-24T05:45:00Z',
-        resolvedAtIso: null,
-        slaDeadlineHours: 24,
-        slaElapsedHours: 3,
-        assignedDepot: 'Joburg Water Randburg Depot',
-        municipalRef: 'JWAPP-40128554',
-      },
-      {
-        id: 'CP-2026-1038',
-        wardId: 'CoJ-115',
-        municipalityCode: 'CoJ',
-        wardNumber: 115,
-        suburb: 'Craigavon',
-        categoryId: 'electricity',
-        departmentLabel: 'City Power Johannesburg',
-        title: 'Mini-substation blown out on Elm Ave',
-        address: '42 Elm Ave, Craigavon, Fourways',
-        status: 'Resolved',
-        severity: 'HIGH',
-        isEmergency: false,
-        clusteredHouseholds: 24,
-        createdAtIso: '2026-03-24T06:10:00Z',
-        resolvedAtIso: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
-        slaDeadlineHours: 24,
-        slaElapsedHours: 2,
-        assignedDepot: 'City Power Bryanston Depot',
-        municipalRef: 'CPWEB5012172',
-      },
-    ];
+    const reports = listReports({ ward, status, category, q }).map((r) =>
+      includeContacts ? r : { ...r, reporterPhone: undefined, corroboratorPhones: undefined }
+    );
 
-    const filtered = serverReports.filter((r) => {
-      if (ward && !r.wardId.toLowerCase().includes(ward) && String(r.wardNumber) !== ward) {
-        return false;
-      }
-      if (status && r.status.toLowerCase() !== status) {
-        return false;
-      }
-      return true;
+    res.json({
+      ok: true,
+      count: reports.length,
+      reports,
+    });
+  });
+
+  app.post('/api/reports', (req, res) => {
+    const body = req.body as {
+      report?: CivicReport;
+      reporterPhone?: string | null;
+      signedIn?: boolean;
+      potentialPoints?: number;
+    };
+
+    if (!body?.report || !body.report.id || !body.report.title) {
+      res.status(400).json({ error: 'Valid report payload with id and title is required.' });
+      return;
+    }
+
+    const result = saveSubmittedReport(body.report, {
+      reporterPhone: body.reporterPhone ?? body.report.reporterPhone ?? null,
+      signedIn: Boolean(body.signedIn),
+      potentialPoints: body.potentialPoints,
+    });
+
+    res.status(201).json({
+      ok: true,
+      report: result.report,
+      contactRecord: result.contactRecord,
+      pendingCreditsForMobile: result.pendingCreditsForMobile,
+    });
+  });
+
+  app.patch('/api/reports/:id', (req, res) => {
+    const reportId = decodeURIComponent(String(req.params.id || '')).trim();
+    if (!reportId) {
+      res.status(400).json({ error: 'Missing report ID.' });
+      return;
+    }
+    const {
+      status,
+      municipalRef,
+      escalationNote,
+      approveStrippedMedia,
+      sendSlaReminder,
+    } = req.body as {
+      status?: ReportStatus;
+      municipalRef?: string;
+      escalationNote?: string;
+      approveStrippedMedia?: boolean;
+      sendSlaReminder?: boolean;
+    };
+
+    const result = patchReportRecord(reportId, {
+      status,
+      municipalRef,
+      escalationNote,
+      approveStrippedMedia,
+      sendSlaReminder,
     });
 
     res.json({
       ok: true,
-      count: filtered.length,
-      reports: filtered,
+      reportId,
+      report: result.report,
+      override: result.override,
     });
   });
 
   app.post('/api/reports/corroborate', (req, res) => {
-    const { reportId, userPhone, wardId } = req.body as {
+    const {
+      reportId,
+      userPhone,
+      reporterName,
+      wardId,
+      wardNumber,
+      municipalityCode,
+      categoryId,
+      reportTitle,
+      address,
+      municipalRef,
+      status,
+      signedIn,
+    } = req.body as {
       reportId?: string;
-      userPhone?: string;
+      userPhone?: string | null;
+      reporterName?: string;
       wardId?: string;
+      wardNumber?: number;
+      municipalityCode?: MunicipalityCode;
+      categoryId?: ServiceCategoryId;
+      reportTitle?: string;
+      address?: string;
+      municipalRef?: string | null;
+      status?: ReportStatus;
+      signedIn?: boolean;
     };
 
     if (!reportId) {
@@ -142,10 +196,28 @@ async function createServer() {
       return;
     }
 
+    const result = recordCorroboration({
+      reportId,
+      userPhone,
+      reporterName,
+      wardId,
+      wardNumber,
+      municipalityCode,
+      categoryId,
+      reportTitle,
+      address,
+      municipalRef,
+      status,
+      signedIn,
+    });
+
     res.json({
       ok: true,
       reportId,
-      creditsEarned: 15,
+      clusteredHouseholds: result.clusteredHouseholds,
+      contactRecord: result.contactRecord,
+      pendingCreditsForMobile: result.pendingCreditsForMobile,
+      creditsEarned: signedIn ? 15 : 0,
       wardId: wardId || 'CoJ-115',
       userPhone: userPhone || 'anonymous',
       message: 'Household successfully linked to incident cluster (+15 CR).',
@@ -153,10 +225,32 @@ async function createServer() {
   });
 
   app.post('/api/reports/verify', (req, res) => {
-    const { reportId, resolvedAtIso, userPhone } = req.body as {
+    const {
+      reportId,
+      resolvedAtIso,
+      userPhone,
+      reporterName,
+      wardId,
+      wardNumber,
+      municipalityCode,
+      categoryId,
+      reportTitle,
+      address,
+      municipalRef,
+      signedIn,
+    } = req.body as {
       reportId?: string;
       resolvedAtIso?: string;
-      userPhone?: string;
+      userPhone?: string | null;
+      reporterName?: string;
+      wardId?: string;
+      wardNumber?: number;
+      municipalityCode?: MunicipalityCode;
+      categoryId?: ServiceCategoryId;
+      reportTitle?: string;
+      address?: string;
+      municipalRef?: string | null;
+      signedIn?: boolean;
     };
 
     if (!reportId) {
@@ -164,28 +258,74 @@ async function createServer() {
       return;
     }
 
-    const fifteenMinsMs = 15 * 60 * 1000;
-    const resolvedTime = resolvedAtIso ? new Date(resolvedAtIso).getTime() : Date.now();
-    const elapsedMs = Date.now() - resolvedTime;
+    const result = recordVerification({
+      reportId,
+      resolvedAtIso,
+      userPhone,
+      reporterName,
+      wardId,
+      wardNumber,
+      municipalityCode,
+      categoryId,
+      reportTitle,
+      address,
+      municipalRef,
+      signedIn,
+    });
 
-    if (elapsedMs > fifteenMinsMs) {
+    if (!result.ok) {
       res.status(400).json({
         ok: false,
-        error: 'Verification window expired. Restored services can only be verified for up to 15 minutes after restoration.',
-        elapsedMinutes: Math.round(elapsedMs / 60000),
+        error: result.error,
+        elapsedMinutes: result.elapsedMinutes,
       });
       return;
     }
 
-    const remainingSec = Math.max(0, Math.round((fifteenMinsMs - elapsedMs) / 1000));
     res.json({
       ok: true,
       reportId,
       creditsEarned: 30,
-      remainingSeconds: remainingSec,
+      remainingSeconds: result.remainingSeconds,
       userPhone: userPhone || 'anonymous',
+      contactRecord: result.contactRecord,
       message: 'Restored service verified by resident (+30 CR).',
     });
+  });
+
+  app.get('/api/councillor/analytics', (req, res) => {
+    const wardId = req.query.wardId ? String(req.query.wardId) : 'ALL';
+    const search = req.query.search ? String(req.query.search) : '';
+    const summary = getCouncillorAnalytics({ wardId, search });
+    res.json(summary);
+  });
+
+  app.get('/api/rewards/pending', (req, res) => {
+    const mobile = String(req.query.mobile || '').trim();
+    if (!mobile) {
+      res.status(400).json({ error: 'Missing mobile query parameter.' });
+      return;
+    }
+    const result = getPendingRewardsForMobile(mobile);
+    if (!result.ok) {
+      res.status(400).json({ error: 'Enter a valid South African mobile number.' });
+      return;
+    }
+    res.json(result);
+  });
+
+  app.post('/api/rewards/claim', (req, res) => {
+    const { mobile } = req.body as { mobile?: string };
+    if (!mobile) {
+      res.status(400).json({ error: 'Mobile number is required to claim pending credits.' });
+      return;
+    }
+    const result = claimRewardsForMobile(mobile);
+    if (!result.ok) {
+      res.status(400).json({ error: 'Enter a valid South African mobile number.' });
+      return;
+    }
+    res.json(result);
   });
 
   app.post('/api/rewards/redeem', (req, res) => {
@@ -201,20 +341,34 @@ async function createServer() {
       return;
     }
 
-    const voucherCode = `CP-${Math.floor(100000 + Math.random() * 900000)}`;
-    const expiresAtIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
+    const record = recordRewardRedemption({ offerId, costCredits, title, userPhone });
     res.json({
       ok: true,
-      voucherCode,
-      offerId,
-      title: title || 'Civic Partner Voucher',
-      costCredits,
-      recipient: userPhone || 'Civic Resident',
-      issuedAtIso: new Date().toISOString(),
-      expiresAtIso,
+      voucherCode: record.voucherCode,
+      offerId: record.offerId,
+      title: record.title,
+      costCredits: record.costCredits,
+      recipient: record.recipient,
+      issuedAtIso: record.issuedAtIso,
+      expiresAtIso: record.expiresAtIso,
       instructions: 'Present this 6-digit PIN code at checkout or enter into municipal billing portal.',
     });
+  });
+
+  app.post('/api/social/link', (req, res) => {
+    const { platform, wardId, linkedReportId, linkedRef } = req.body as {
+      platform?: string;
+      wardId?: string;
+      linkedReportId?: string | null;
+      linkedRef?: string | null;
+    };
+    recordSocialLinkEvent({
+      platform: platform || 'WhatsApp',
+      wardId: wardId || 'CoJ-115',
+      linkedReportId,
+      linkedRef,
+    });
+    res.json({ ok: true });
   });
 
   app.post('/api/forensics/analyze', async (req, res) => {
@@ -232,7 +386,6 @@ async function createServer() {
         return;
       }
 
-      const ai = getAiClient();
       const promptText = [
         `Current Server Time (ISO): ${new Date().toISOString()}`,
         `Reported Address / Pin: ${reportedAddress || 'Not specified'}`,
@@ -241,74 +394,75 @@ async function createServer() {
         'Analyze this civic fault evidence image for authenticity, metadata consistency, and municipal engineering triage.',
       ].join('\n\n');
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType,
-                data: imageBase64,
-              },
+      const aiResult = await runEconomicAiWithFallback({
+        task: 'forensics',
+        systemInstruction: FORENSIC_SYSTEM_PROMPT,
+        promptText,
+        imageBase64,
+        imageMimeType: mimeType,
+        jsonSchemaDescription: `{
+  "authenticityStatus": "VERIFIED | WARNING_STRIPPED_METADATA | FLAGGED_SYNTHETIC",
+  "confidenceScore": number (0.0 to 1.0),
+  "isAiGenerated": boolean,
+  "forensicNotes": string,
+  "metadataCheck": { "timestampValid": boolean, "gpsMatchMeters": number | null, "deviceDetected": string },
+  "triage": { "department": "Water|Electricity|Roads|Streetlights|Waste|Parks|Safety", "faultTitle": string, "severity": "LOW|MODERATE|HIGH|CRITICAL", "engineeringSummary": string, "immediateDanger": boolean }
+}`,
+        geminiSchema: {
+          type: Type.OBJECT,
+          properties: {
+            authenticityStatus: {
+              type: Type.STRING,
+              description: 'One of VERIFIED, WARNING_STRIPPED_METADATA, or FLAGGED_SYNTHETIC',
             },
-            { text: promptText },
-          ],
-        },
-        config: {
-          systemInstruction: FORENSIC_SYSTEM_PROMPT,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              authenticityStatus: {
-                type: Type.STRING,
-                description: 'One of VERIFIED, WARNING_STRIPPED_METADATA, or FLAGGED_SYNTHETIC',
-              },
-              confidenceScore: {
-                type: Type.NUMBER,
-                description: 'Confidence score between 0.0 and 1.0',
-              },
-              isAiGenerated: {
-                type: Type.BOOLEAN,
-              },
-              forensicNotes: {
-                type: Type.STRING,
-              },
-              metadataCheck: {
-                type: Type.OBJECT,
-                properties: {
-                  timestampValid: { type: Type.BOOLEAN },
-                  gpsMatchMeters: { type: Type.NUMBER, nullable: true },
-                  deviceDetected: { type: Type.STRING },
-                },
-                required: ['timestampValid', 'deviceDetected'],
-              },
-              triage: {
-                type: Type.OBJECT,
-                properties: {
-                  department: {
-                    type: Type.STRING,
-                    description: 'One of Water, Electricity, Roads, Streetlights, Waste, Parks, Safety',
-                  },
-                  faultTitle: { type: Type.STRING },
-                  severity: {
-                    type: Type.STRING,
-                    description: 'One of LOW, MODERATE, HIGH, CRITICAL',
-                  },
-                  engineeringSummary: { type: Type.STRING },
-                  immediateDanger: { type: Type.BOOLEAN },
-                },
-                required: ['department', 'faultTitle', 'severity', 'engineeringSummary', 'immediateDanger'],
-              },
+            confidenceScore: {
+              type: Type.NUMBER,
+              description: 'Confidence score between 0.0 and 1.0',
             },
-            required: ['authenticityStatus', 'confidenceScore', 'isAiGenerated', 'forensicNotes', 'metadataCheck', 'triage'],
+            isAiGenerated: {
+              type: Type.BOOLEAN,
+            },
+            forensicNotes: {
+              type: Type.STRING,
+            },
+            metadataCheck: {
+              type: Type.OBJECT,
+              properties: {
+                timestampValid: { type: Type.BOOLEAN },
+                gpsMatchMeters: { type: Type.NUMBER, nullable: true },
+                deviceDetected: { type: Type.STRING },
+              },
+              required: ['timestampValid', 'deviceDetected'],
+            },
+            triage: {
+              type: Type.OBJECT,
+              properties: {
+                department: {
+                  type: Type.STRING,
+                  description: 'One of Water, Electricity, Roads, Streetlights, Waste, Parks, Safety',
+                },
+                faultTitle: { type: Type.STRING },
+                severity: {
+                  type: Type.STRING,
+                  description: 'One of LOW, MODERATE, HIGH, CRITICAL',
+                },
+                engineeringSummary: { type: Type.STRING },
+                immediateDanger: { type: Type.BOOLEAN },
+              },
+              required: ['department', 'faultTitle', 'severity', 'engineeringSummary', 'immediateDanger'],
+            },
           },
+          required: ['authenticityStatus', 'confidenceScore', 'isAiGenerated', 'forensicNotes', 'metadataCheck', 'triage'],
         },
       });
 
-      const rawText = (response.text ?? '{}').trim();
-      const parsed = JSON.parse(rawText);
-      res.json(parsed);
+      res.json({
+        ...aiResult.data,
+        aiProvider: aiResult.provider,
+        aiProviderLabel: aiResult.providerLabel,
+        aiModel: aiResult.model,
+        fallbackUsed: aiResult.fallbackUsed,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Forensic analysis failed.';
       console.error('Forensic API error:', message);
@@ -317,22 +471,30 @@ async function createServer() {
   });
 
   app.post('/api/chat', async (req, res) => {
-    try {
-      const { messages, wardContext, activeReports, imageBase64, imageMimeType } = req.body as {
-        messages: Array<{ role: 'user' | 'assistant'; text: string }>;
-        wardContext?: unknown;
-        activeReports?: unknown[];
-        imageBase64?: string;
-        imageMimeType?: string;
-      };
+    const { messages, wardContext, activeReports, imageBase64, imageMimeType } = req.body as {
+      messages?: Array<{ role: 'user' | 'assistant'; text: string }>;
+      wardContext?: Record<string, unknown>;
+      activeReports?: Array<Record<string, unknown>>;
+      imageBase64?: string;
+      imageMimeType?: string;
+    };
 
-      if (!messages || !Array.isArray(messages) || messages.length === 0) {
-        res.status(400).json({ error: 'Messages array is required.' });
-        return;
-      }
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      res.status(400).json({ error: 'Messages array is required.' });
+      return;
+    }
 
-      const ai = getAiClient();
-      const systemInstruction = `You are CivicRewards AI, a 2027 South African Municipal Civic Assistant.
+    const latestUserMessage = messages[messages.length - 1];
+    const historySummary = messages
+      .slice(0, -1)
+      .map((m) => `${m.role === 'user' ? 'Resident' : 'CivicRewards AI'}: ${m.text}`)
+      .join('\n');
+
+    const promptText = historySummary
+      ? `Conversation history:\n${historySummary}\n\nLatest resident message: ${latestUserMessage.text}`
+      : latestUserMessage.text;
+
+    const systemInstruction = `You are CivicRewards AI, a 2027 South African Municipal Civic Assistant.
 You help residents across City of Johannesburg (CoJ), City of Cape Town (CoCT), City of Tshwane (CoT), and eThekwini Metropolitan Municipality.
 You know South African municipal bylaws, depot escalation rules, municipal reference formats (e.g., City Power CPWEB5012172, Joburg Water JWAPP-40128554, Tshwane TSH-882910), load shedding schedules, water tanker deployment protocols, and municipal billing/debt relief rules.
 
@@ -346,70 +508,66 @@ Instructions:
 1. Be concise, practical, and warm. Use South African civic terminology accurately (ward councillor, regional depot, SLA, Eskom/City Power, Joburg Water, JRA, Pikitup, JMPD, CoCT, IEC).
 2. If the user describes a new municipal fault (or uploads a fault photo), check if it matches any report in Current Active Reports.
    - If it matches an existing report, set actionType to "CORROBORATE_EXISTING" and provide matchedReportId.
-   - If it is a new fault ready to be logged, set actionType to "CREATE_TICKET" and fill ticketDraft with department, title, address, severity, and engineeringSummary.
+   - If it is a new fault ready to be logged, set actionType to "CREATE_TICKET" and fill ticketDraft with categoryId, title, address, severity, and description.
    - Otherwise (informational Q&A, bylaws, billing help), set actionType to "NONE".
 3. Always reply in valid JSON matching the schema.`;
 
-      const latestUserMessage = messages[messages.length - 1];
-      const historySummary = messages
-        .slice(0, -1)
-        .map((m) => `${m.role === 'user' ? 'Resident' : 'CivicRewards AI'}: ${m.text}`)
-        .join('\n');
-
-      const promptText = historySummary
-        ? `Conversation history:\n${historySummary}\n\nLatest resident message: ${latestUserMessage.text}`
-        : latestUserMessage.text;
-
-      const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
-      if (imageBase64 && imageMimeType) {
-        parts.push({
-          inlineData: {
-            mimeType: imageMimeType,
-            data: imageBase64,
-          },
-        });
-      }
-      parts.push({ text: promptText });
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: { parts },
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              reply: { type: Type.STRING },
-              actionType: {
-                type: Type.STRING,
-                description: 'One of NONE, CREATE_TICKET, or CORROBORATE_EXISTING',
-              },
-              matchedReportId: { type: Type.STRING, nullable: true },
-              ticketDraft: {
-                type: Type.OBJECT,
-                nullable: true,
-                properties: {
-                  categoryId: { type: Type.STRING },
-                  title: { type: Type.STRING },
-                  address: { type: Type.STRING },
-                  severity: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                },
+    try {
+      const aiResult = await runEconomicAiWithFallback({
+        task: 'chat',
+        systemInstruction,
+        promptText,
+        imageBase64,
+        imageMimeType,
+        jsonSchemaDescription: `{
+  "reply": string,
+  "actionType": "NONE | CREATE_TICKET | CORROBORATE_EXISTING",
+  "matchedReportId": string | null,
+  "ticketDraft": { "categoryId": "water|electricity|waste|sanitation|roads|streetlights|parks|safety", "title": string, "address": string, "severity": "LOW|MODERATE|HIGH|CRITICAL", "description": string } | null
+}`,
+        geminiSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reply: { type: Type.STRING },
+            actionType: {
+              type: Type.STRING,
+              description: 'One of NONE, CREATE_TICKET, or CORROBORATE_EXISTING',
+            },
+            matchedReportId: { type: Type.STRING, nullable: true },
+            ticketDraft: {
+              type: Type.OBJECT,
+              nullable: true,
+              properties: {
+                categoryId: { type: Type.STRING },
+                title: { type: Type.STRING },
+                address: { type: Type.STRING },
+                severity: { type: Type.STRING },
+                description: { type: Type.STRING },
               },
             },
-            required: ['reply', 'actionType'],
           },
+          required: ['reply', 'actionType'],
         },
       });
 
-      const rawText = (response.text ?? '{}').trim();
-      const parsed = JSON.parse(rawText);
-      res.json(parsed);
+      res.json({
+        ...aiResult.data,
+        aiProvider: aiResult.provider,
+        aiProviderLabel: aiResult.providerLabel,
+        aiModel: aiResult.model,
+        fallbackUsed: aiResult.fallbackUsed,
+        fallbackReason: aiResult.fallbackReason,
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Chat assistant error.';
-      console.error('Chat API error:', message);
-      res.status(500).json({ error: message });
+      const message = error instanceof Error ? error.message : 'All AI providers unavailable.';
+      console.warn('Chat AI fallback engaged:', message);
+      const localFallback = buildLocalWardTriageFallback({
+        latestMessage: latestUserMessage.text,
+        wardContext: wardContext as Parameters<typeof buildLocalWardTriageFallback>[0]['wardContext'],
+        activeReports: activeReports as Parameters<typeof buildLocalWardTriageFallback>[0]['activeReports'],
+        fallbackReason: message,
+      });
+      res.json(localFallback);
     }
   });
 
@@ -427,32 +585,42 @@ Instructions:
         return;
       }
 
-      const ai = getAiClient();
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: `Platform: ${platform}\nWard Context: ${JSON.stringify(wardContext ?? {})}\nActive Incidents: ${JSON.stringify(activeReports ?? [])}\n\nIncoming Community / Social Post:\n"${rawMessage}"\n\nExtract the municipal entity handle, fault category, suburb/street, official reference number if present, whether it matches an existing active incident ID, and produce a concise 1-sentence unified ward alert.`,
-        config: {
-          systemInstruction:
-            'You are a South African Municipal Social Outage Ingestion AI. Cluster citizen WhatsApp/Telegram/X posts into structured ward alerts and match them to existing tickets when relevant.',
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              summary: { type: Type.STRING },
-              department: { type: Type.STRING },
-              entityHandle: { type: Type.STRING },
-              extractedRefNumber: { type: Type.STRING, nullable: true },
-              matchedReportId: { type: Type.STRING, nullable: true },
-              estimatedHouseholdsAffected: { type: Type.INTEGER },
-              suburb: { type: Type.STRING },
-            },
-            required: ['summary', 'department', 'entityHandle', 'estimatedHouseholdsAffected', 'suburb'],
+      const aiResult = await runEconomicAiWithFallback({
+        task: 'social',
+        systemInstruction:
+          'You are a South African Municipal Social Outage Ingestion AI. Cluster citizen WhatsApp/Telegram/X posts into structured ward alerts and match them to existing tickets when relevant.',
+        promptText: `Platform: ${platform}\nWard Context: ${JSON.stringify(wardContext ?? {})}\nActive Incidents: ${JSON.stringify(activeReports ?? [])}\n\nIncoming Community / Social Post:\n"${rawMessage}"\n\nExtract the municipal entity handle, fault category, suburb/street, official reference number if present, whether it matches an existing active incident ID, and produce a concise 1-sentence unified ward alert.`,
+        jsonSchemaDescription: `{
+  "summary": string,
+  "department": string,
+  "entityHandle": string,
+  "extractedRefNumber": string | null,
+  "matchedReportId": string | null,
+  "estimatedHouseholdsAffected": integer,
+  "suburb": string
+}`,
+        geminiSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING },
+            department: { type: Type.STRING },
+            entityHandle: { type: Type.STRING },
+            extractedRefNumber: { type: Type.STRING, nullable: true },
+            matchedReportId: { type: Type.STRING, nullable: true },
+            estimatedHouseholdsAffected: { type: Type.INTEGER },
+            suburb: { type: Type.STRING },
           },
+          required: ['summary', 'department', 'entityHandle', 'estimatedHouseholdsAffected', 'suburb'],
         },
       });
 
-      const rawText = (response.text ?? '{}').trim();
-      res.json(JSON.parse(rawText));
+      res.json({
+        ...aiResult.data,
+        aiProvider: aiResult.provider,
+        aiProviderLabel: aiResult.providerLabel,
+        aiModel: aiResult.model,
+        fallbackUsed: aiResult.fallbackUsed,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Social summarizer failed.';
       console.error('Social API error:', message);

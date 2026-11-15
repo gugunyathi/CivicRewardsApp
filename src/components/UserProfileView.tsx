@@ -16,10 +16,12 @@ import {
   MapPin,
   MessageCircle,
   Pencil,
+  Phone,
   Plus,
   Receipt,
   Send,
   ShieldCheck,
+  Sparkles,
   TrendingDown,
   TrendingUp,
   User,
@@ -29,6 +31,8 @@ import { REWARD_OFFERS, SEED_WARD_TOWN_BENCHMARKS, SEED_WARDS } from '../data/ci
 import { AvatarPlaceholder, RewardCategoryIcon, SmartImage } from './SmartImage';
 import { EscalationPanel } from './EscalationPanel';
 import { SlaCountdown } from './SlaCountdown';
+import { civicApi } from '../utils/civicApi';
+import { formatSaMobileDisplay } from '../utils/phone';
 import { openWhatsAppShare } from '../utils/share';
 import {
   authClient,
@@ -59,6 +63,9 @@ interface UserProfileViewProps {
   onOpenAuthModal: () => void;
   onOpenReportModal: () => void;
   onRedeemOffer: (offerId: string, cost: number, title: string) => boolean;
+  onClaimMobileRewards?: (
+    mobile: string
+  ) => Promise<{ claimedPoints: number; claimedCount: number } | null>;
   onVerifyResolution: (reportId: string) => void;
   onAttachRef: (reportId: string, refCode: string) => void;
   onSendSlaReminder: (reportId: string) => void;
@@ -122,6 +129,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
   onOpenAuthModal,
   onOpenReportModal,
   onRedeemOffer,
+  onClaimMobileRewards,
   onVerifyResolution,
   onAttachRef,
   onSendSlaReminder,
@@ -130,6 +138,16 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
 }) => {
   const [tab, setTab] = useState<ProfileTab>(initialTab ?? 'reports');
   const [issuedVoucher, setIssuedVoucher] = useState<string | null>(null);
+
+  const [claimMobileInput, setClaimMobileInput] = useState(user.mobileZa || '');
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimPreview, setClaimPreview] = useState<{
+    displayMobile: string;
+    pendingPoints: number;
+    pendingCount: number;
+    claimedPoints: number;
+  } | null>(null);
 
   // Sign-in state
   const [channel, setChannel] = useState<AuthChannel>(user.authChannel || 'google');
@@ -148,6 +166,12 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
   useEffect(() => {
     if (initialTab) setTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    if (user.mobileZa && !claimMobileInput) {
+      setClaimMobileInput(user.mobileZa);
+    }
+  }, [user.mobileZa, claimMobileInput]);
 
   useEffect(() => {
     if (!user.signedIn) {
@@ -357,6 +381,67 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
     setOtpSent(false);
     setOtpCode('');
     setAuthNotice('Signed out.');
+  };
+
+  const handleCheckPendingRewards = async () => {
+    if (!claimMobileInput.trim()) {
+      setClaimError('Enter the South African mobile number used when reporting.');
+      return;
+    }
+    setClaimBusy(true);
+    setClaimError(null);
+    try {
+      const res = await civicApi.fetchPendingRewards(claimMobileInput.trim());
+      setClaimPreview({
+        displayMobile: res.displayMobile || formatSaMobileDisplay(claimMobileInput),
+        pendingPoints: res.pendingPoints,
+        pendingCount: res.pendingCount,
+        claimedPoints: res.claimedPoints,
+      });
+    } catch (err) {
+      setClaimPreview(null);
+      setClaimError(err instanceof Error ? err.message : 'Unable to check pending points.');
+    } finally {
+      setClaimBusy(false);
+    }
+  };
+
+  const handleClaimPendingRewards = async () => {
+    if (!claimMobileInput.trim()) {
+      setClaimError('Enter the mobile number used when reporting.');
+      return;
+    }
+    if (!user.signedIn) {
+      setClaimError('Sign in above first so claimed Civic Credits can be added to your balance.');
+      return;
+    }
+    if (!onClaimMobileRewards) return;
+    setClaimBusy(true);
+    setClaimError(null);
+    try {
+      const result = await onClaimMobileRewards(claimMobileInput.trim());
+      if (result) {
+        setClaimPreview((prev) =>
+          prev
+            ? {
+                ...prev,
+                pendingPoints: 0,
+                pendingCount: 0,
+                claimedPoints: prev.claimedPoints + result.claimedPoints,
+              }
+            : {
+                displayMobile: formatSaMobileDisplay(claimMobileInput.trim()),
+                pendingPoints: 0,
+                pendingCount: 0,
+                claimedPoints: result.claimedPoints,
+              }
+        );
+      }
+    } catch (err) {
+      setClaimError(err instanceof Error ? err.message : 'Unable to claim points.');
+    } finally {
+      setClaimBusy(false);
+    }
   };
 
   const authFieldClass =
@@ -864,6 +949,76 @@ export const UserProfileView: React.FC<UserProfileViewProps> = React.memo(({
                 Cashed Out: <strong>-{totalCashedOut} CR</strong>
               </span>
             </div>
+          </div>
+
+          {/* Claim Points Earned via Reporting Mobile Number */}
+          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-emerald-700/35 dark:border-emerald-400/25 p-4 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
+                <h2 className="font-display text-sm font-bold text-slate-900 dark:text-white">
+                  Claim Points by Mobile Number
+                </h2>
+              </div>
+              <span className="text-[11px] text-slate-600 dark:text-slate-400">
+                Reported using a mobile number? Claim CR here.
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Phone className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={claimMobileInput}
+                  onChange={(e) => {
+                    setClaimMobileInput(e.target.value);
+                    if (claimError) setClaimError(null);
+                  }}
+                  placeholder="082 123 4567 or +27 82 123 4567"
+                  className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-xs font-mono tabular-nums text-slate-950 dark:text-white placeholder:font-sans placeholder:text-slate-500 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={claimBusy}
+                  onClick={() => void handleCheckPendingRewards()}
+                  className="h-10 px-3.5 rounded-xl border border-slate-400 dark:border-white/15 bg-slate-50 dark:bg-white/[0.04] text-xs font-semibold text-slate-900 dark:text-white cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {claimBusy ? 'Checking...' : 'Check Pending'}
+                </button>
+                <button
+                  type="button"
+                  disabled={claimBusy}
+                  onClick={() => void handleClaimPendingRewards()}
+                  className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {claimPreview && claimPreview.pendingPoints > 0
+                    ? `Claim +${claimPreview.pendingPoints} CR`
+                    : 'Claim Points'}
+                </button>
+              </div>
+            </div>
+
+            {claimError && (
+              <div className="text-xs text-red-700 dark:text-red-300 font-medium">{claimError}</div>
+            )}
+
+            {claimPreview && (
+              <div className="text-xs font-mono text-slate-700 dark:text-slate-300 tabular-nums flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-semibold text-slate-950 dark:text-white">
+                  {claimPreview.displayMobile}
+                </span>
+                <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                  Pending: +{claimPreview.pendingPoints} CR ({claimPreview.pendingCount} report
+                  {claimPreview.pendingCount === 1 ? '' : 's'})
+                </span>
+                <span>Already claimed: {claimPreview.claimedPoints} CR</span>
+              </div>
+            )}
           </div>
 
           {issuedVoucher && (

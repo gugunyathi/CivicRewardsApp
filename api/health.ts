@@ -1,9 +1,12 @@
 // api/health.ts – Vercel serverless function
-export default function handler(req: any, res: any) {
+import { getStoreMetrics } from '../server-store';
+import { getAiCapabilitiesStatus } from '../server-ai';
+
+export default function handler(_req: any, res: any) {
   res.json({
     ok: true,
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    ...getAiCapabilitiesStatus(),
     hasMapboxToken: Boolean(process.env.MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN),
+    ...getStoreMetrics(),
   });
 }
-

@@ -14,6 +14,7 @@ import {
   LocateFixed,
   LogIn,
   MapPin,
+  Phone,
   ShieldAlert,
   ShieldCheck,
   SkipForward,
@@ -35,6 +36,7 @@ import type {
 } from '../types/civic';
 import { getDepotForCategory, haversineDistanceMeters } from '../utils/wardResolver';
 import { generateMunicipalRef, getRefGuidance } from '../utils/municipalRefs';
+import { formatSaMobileDisplay, normalizeSaMobile } from '../utils/phone';
 import { BASEMAP_ORDER, BASEMAPS, type BasemapId } from '../utils/mapTiles';
 import { InteractiveMap } from './InteractiveMap';
 
@@ -46,11 +48,16 @@ interface ReportFormModalProps {
   emergencyMode: boolean;
   existingReports: CivicReport[];
   onClose: () => void;
-  onSubmitNewReport: (report: CivicReport, rewardPoints: number) => void;
-  onCorroborateExisting: (reportId: string) => void;
+  onSubmitNewReport: (report: CivicReport, rewardPoints: number, potentialPoints?: number) => void;
+  onCorroborateExisting: (
+    reportId: string,
+    reporterInfo?: { phone?: string | null; name?: string }
+  ) => void;
   onViewInFeed?: (reportId: string) => void;
   onGoToProfileSignIn?: () => void;
   signedIn: boolean;
+  userMobile?: string;
+  userName?: string;
 }
 
 const SAMPLE_TEST_MEDIA = [
@@ -291,6 +298,8 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   onViewInFeed,
   onGoToProfileSignIn,
   signedIn,
+  userMobile = '',
+  userName = '',
 }) => {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [transitionDir, setTransitionDir] = useState<'forward' | 'back'>('forward');
@@ -302,12 +311,22 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   } | null>(null);
 
   // Step 1: Intro & Reporter Info
-  const [reporterName, setReporterName] = useState('');
+  const [reporterName, setReporterName] = useState(userName || '');
+  const [reporterMobile, setReporterMobile] = useState(userMobile || '');
   const [reporterSuburb, setReporterSuburb] = useState(DEFAULT_REPORTER_STREET_SUBURB);
 
+  const actionableCategories = SERVICE_CATEGORIES.filter((c) => !c.isInfoModule);
+  const resolvedInitialCategory: ServiceCategoryId = actionableCategories.some(
+    (c) => c.id === initialCategoryId
+  )
+    ? initialCategoryId
+    : 'water';
+
   // Step 2: The Issue
-  const [selectedDepartment, setSelectedDepartment] = useState<ServiceCategoryId | ''>('');
-  const [categoryId, setCategoryId] = useState<ServiceCategoryId>(initialCategoryId);
+  const [selectedDepartment, setSelectedDepartment] = useState<ServiceCategoryId | ''>(
+    resolvedInitialCategory
+  );
+  const [categoryId, setCategoryId] = useState<ServiceCategoryId>(resolvedInitialCategory);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
@@ -339,8 +358,6 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const swipeRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
 
-  const actionableCategories = SERVICE_CATEGORIES.filter((c) => !c.isInfoModule);
-
   useEffect(() => {
     if (isOpen) {
       const safeInitial = SERVICE_CATEGORIES.find((c) => c.id === initialCategoryId && !c.isInfoModule)
@@ -348,9 +365,10 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
         : 'water';
       setStep(1);
       setTransitionDir('forward');
-      setReporterName('');
+      setReporterName(userName || '');
+      setReporterMobile(userMobile || '');
       setReporterSuburb(DEFAULT_REPORTER_STREET_SUBURB);
-      setSelectedDepartment('');
+      setSelectedDepartment(safeInitial);
       setCategoryId(safeInitial);
       setTitle('');
       setDescription('');
@@ -368,7 +386,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       setSubmittedReceipt(null);
       setAddedMeTooIds({});
     }
-  }, [isOpen, initialCategoryId, activeWard, emergencyMode]);
+  }, [isOpen, initialCategoryId, activeWard, emergencyMode, userMobile, userName]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -440,6 +458,12 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
     if (currentStep === 1) {
       if (!reporterName.trim()) {
         return 'Please enter your name before continuing.';
+      }
+      if (!reporterMobile.trim()) {
+        return 'Please enter your mobile number so you can claim CivicRewards points and receive councillor updates.';
+      }
+      if (!normalizeSaMobile(reporterMobile)) {
+        return 'Please enter a valid South African mobile number (e.g. 082 123 4567 or +27 82 123 4567).';
       }
       if (!reporterSuburb.trim()) {
         return 'Please enter your street address and suburb before continuing.';
@@ -709,6 +733,8 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
         ? description.trim().slice(0, 72)
         : `${currentCategory.shortTitle} fault at ${resolvedAddress}`);
 
+    const normalizedPhone = normalizeSaMobile(reporterMobile) || reporterMobile.trim();
+
     const report: CivicReport = {
       id: newId,
       wardId: activeWard.id,
@@ -737,6 +763,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       slaElapsedHours: 0,
       assignedDepot,
       reporterName: reporterName.trim() || (signedIn ? 'You (Ward Resident)' : 'Guest Resident'),
+      reporterPhone: normalizedPhone,
       photoUrl: previewUrl ?? undefined,
       forensics: {
         status: forensics?.authenticityStatus ?? 'WARNING_STRIPPED_METADATA',
@@ -764,7 +791,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
       verifiedByResidents: 1,
     };
 
-    onSubmitNewReport(report, rewardPoints);
+    onSubmitNewReport(report, rewardPoints, potentialPoints);
     setSubmittedReceipt({
       report,
       earnedPoints: rewardPoints,
@@ -885,6 +912,9 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                   </div>
                   <p className="text-xs text-emerald-900 dark:text-emerald-200/85">
                     {tierLabel} · Credited to your CivicRewards balance.
+                    {report.reporterPhone
+                      ? ` Number ${formatSaMobileDisplay(report.reporterPhone)} shared with Ward Councillor for coordination & verification.`
+                      : ''}
                   </p>
                 </div>
               </div>
@@ -899,7 +929,9 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       You could have earned +{potentialPoints} Civic Credits!
                     </div>
                     <p className="text-xs text-amber-950/90 dark:text-amber-100/80 leading-relaxed">
-                      Submitted as Guest (0 CR). Sign up now to earn Civic Credits for reporting faults, +1 Me Too corroborations, and verifying fixes.
+                      {report.reporterPhone
+                        ? `+${potentialPoints} CR reserved for ${formatSaMobileDisplay(report.reporterPhone)}. Sign in with this mobile number on Profile → Points to claim your credits. Your number has also been shared with ${activeWard.councillor.name} for coordination & verification.`
+                        : 'Submitted as Guest (0 CR). Sign up now to earn Civic Credits for reporting faults, +1 Me Too corroborations, and verifying fixes.'}
                     </p>
                   </div>
                 </div>
@@ -910,7 +942,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                     className="w-full min-h-[40px] px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] transition-[background-color,transform] duration-150"
                   >
                     <LogIn className="w-3.5 h-3.5" />
-                    <span>Sign Up Now to Earn Points (+{potentialPoints} CR per report)</span>
+                    <span>Sign Up Now to Claim +{potentialPoints} CR</span>
                   </button>
                 )}
               </div>
@@ -1079,6 +1111,35 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
 
                   <div>
                     <label
+                      htmlFor="wizard-reporter-mobile"
+                      className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
+                    >
+                      Mobile Number (SA) <span className="text-red-600">*</span>
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 text-slate-600 dark:text-slate-400 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="wizard-reporter-mobile"
+                        type="tel"
+                        inputMode="tel"
+                        value={reporterMobile}
+                        onChange={(e) => {
+                          setReporterMobile(e.target.value);
+                          if (validationError) setValidationError(null);
+                        }}
+                        onKeyDown={handleEnterAdvance}
+                        placeholder="082 123 4567 or +27 82 123 4567"
+                        autoComplete="tel"
+                        className="w-full h-12 pl-10 pr-3.5 rounded-xl border border-slate-500 dark:border-white/15 bg-white dark:bg-white/[0.04] text-sm font-mono tabular-nums text-slate-950 dark:text-white placeholder:font-sans placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-[#0B0F17] focus:outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25 transition-[border-color,box-shadow,background-color] duration-150"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-snug text-slate-700 dark:text-slate-300">
+                      Use this number to claim CivicRewards points for reporting. Reporting numbers are shared with your Ward Councillor for coordination, escalation, and verification.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label
                       htmlFor="wizard-reporter-suburb"
                       className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5"
                     >
@@ -1148,7 +1209,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                       <ChevronDown className="w-4 h-4 text-slate-700 dark:text-slate-400 pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
                     </div>
 
-                    {!selectedDepartment && suggestedCategory && (
+                    {suggestedCategory && selectedDepartment !== suggestedCategory.id && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1158,7 +1219,7 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                         }}
                         className="mt-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                       >
-                        Quick pick: {suggestedCategory.title}
+                        Switch back to {suggestedCategory.title}
                       </button>
                     )}
                   </div>
@@ -1184,7 +1245,14 @@ export const ReportFormModal: React.FC<ReportFormModalProps> = ({
                           disabled={isMeTooAdded}
                           onClick={() => {
                             if (isMeTooAdded) return;
-                            onCorroborateExisting(nearbyDuplicate.id);
+                            onCorroborateExisting(nearbyDuplicate.id, {
+                              phone:
+                                normalizeSaMobile(reporterMobile) ||
+                                reporterMobile.trim() ||
+                                userMobile ||
+                                null,
+                              name: reporterName.trim() || userName || undefined,
+                            });
                             setAddedMeTooIds((prev) => ({ ...prev, [nearbyDuplicate.id]: true }));
                           }}
                           className={`shrink-0 min-h-[36px] px-3 rounded-lg text-white text-[11px] font-semibold flex items-center gap-1.5 transition-[background-color,transform] duration-150 ${

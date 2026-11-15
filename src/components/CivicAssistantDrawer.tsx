@@ -30,6 +30,9 @@ interface ChatMessage {
     description: string;
   } | null;
   actionExecuted?: boolean;
+  aiProviderLabel?: string;
+  aiModel?: string;
+  fallbackUsed?: boolean;
 }
 
 interface CivicAssistantDrawerProps {
@@ -155,6 +158,9 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
           actionType: data.actionType,
           matchedReportId: data.matchedReportId,
           ticketDraft: data.ticketDraft,
+          aiProviderLabel: data.aiProviderLabel,
+          aiModel: data.aiModel,
+          fallbackUsed: Boolean(data.fallbackUsed),
         },
       ]);
     } catch (err) {
@@ -193,10 +199,10 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
       lng: activeWard.lng,
       municipalRef: null,
       status: 'Logged',
-      severity: (['LOW', 'MODERATE', 'HIGH', 'CRITICAL'].includes(draft.severity)
-        ? draft.severity
+      severity: (['LOW', 'MODERATE', 'HIGH', 'CRITICAL'].includes((draft.severity || '').toUpperCase())
+        ? draft.severity.toUpperCase()
         : 'MODERATE') as SeverityLevel,
-      isEmergency: draft.severity === 'CRITICAL',
+      isEmergency: (draft.severity || '').toUpperCase() === 'CRITICAL',
       clusteredHouseholds: 1,
       createdAtIso: new Date().toISOString(),
       timeAgoLabel: 'Just now (via Triage Chat)',
@@ -329,6 +335,14 @@ export const CivicAssistantDrawer: React.FC<CivicAssistantDrawerProps> = ({
                           : 'Confirm & Log Ticket (+40 cr)'}
                       </span>
                     </button>
+                  </div>
+                )}
+                {m.role === 'assistant' && (m.aiProviderLabel || m.aiModel) && (
+                  <div className="pt-1 flex items-center justify-between gap-2 text-[10px] font-mono text-slate-600 dark:text-slate-400">
+                    <span className="truncate">
+                      {m.fallbackUsed ? 'Fallback · ' : ''}
+                      {m.aiProviderLabel || m.aiModel}
+                    </span>
                   </div>
                 )}
               </div>

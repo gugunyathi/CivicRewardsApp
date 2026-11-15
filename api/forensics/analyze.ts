@@ -1,5 +1,6 @@
 // api/forensics/analyze.ts – Vercel serverless function
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
+import { runEconomicAiWithFallback } from '../../server-ai';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '25mb' } },
@@ -17,7 +18,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { imageBase64, mimeType, exifMetadata, reportedAddress, wardContext } = req.body as {
+    const { imageBase64, mimeType, exifMetadata, reportedAddress, wardContext } = (req.body || {}) as {
       imageBase64?: string;
       mimeType?: string;
       exifMetadata?: Record<string, unknown>;
@@ -29,13 +30,6 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Missing imageBase64 or mimeType.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured.' });
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-
     const promptText = [
       `Current Server Time (ISO): ${new Date().toISOString()}`,
       `Reported Address / Pin: ${reportedAddress || 'Not specified'}`,
@@ -44,59 +38,68 @@ export default async function handler(req: any, res: any) {
       'Analyze this civic fault evidence image for authenticity, metadata consistency, and municipal engineering triage.',
     ].join('\n\n');
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
-        parts: [
-          { inlineData: { mimeType, data: imageBase64 } },
-          { text: promptText },
-        ],
-      },
-      config: {
-        systemInstruction: FORENSIC_SYSTEM_PROMPT,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            authenticityStatus: {
-              type: Type.STRING,
-              description: 'One of VERIFIED, WARNING_STRIPPED_METADATA, or FLAGGED_SYNTHETIC',
-            },
-            confidenceScore: { type: Type.NUMBER },
-            isAiGenerated: { type: Type.BOOLEAN },
-            forensicNotes: { type: Type.STRING },
-            metadataCheck: {
-              type: Type.OBJECT,
-              properties: {
-                timestampValid: { type: Type.BOOLEAN },
-                gpsMatchMeters: { type: Type.NUMBER, nullable: true },
-                deviceDetected: { type: Type.STRING },
-              },
-              required: ['timestampValid', 'deviceDetected'],
-            },
-            triage: {
-              type: Type.OBJECT,
-              properties: {
-                department: { type: Type.STRING },
-                faultTitle: { type: Type.STRING },
-                severity: { type: Type.STRING, description: 'One of LOW, MODERATE, HIGH, CRITICAL' },
-                engineeringSummary: { type: Type.STRING },
-                immediateDanger: { type: Type.BOOLEAN },
-              },
-              required: ['department', 'faultTitle', 'severity', 'engineeringSummary', 'immediateDanger'],
-            },
+    const aiResult = await runEconomicAiWithFallback({
+      task: 'forensics',
+      systemInstruction: FORENSIC_SYSTEM_PROMPT,
+      promptText,
+      imageBase64,
+      imageMimeType: mimeType,
+      jsonSchemaDescription: `{
+  "authenticityStatus": "VERIFIED | WARNING_STRIPPED_METADATA | FLAGGED_SYNTHETIC",
+  "confidenceScore": number (0.0 to 1.0),
+  "isAiGenerated": boolean,
+  "forensicNotes": string,
+  "metadataCheck": { "timestampValid": boolean, "gpsMatchMeters": number | null, "deviceDetected": string },
+  "triage": { "department": "Water|Electricity|Roads|Streetlights|Waste|Parks|Safety", "faultTitle": string, "severity": "LOW|MODERATE|HIGH|CRITICAL", "engineeringSummary": string, "immediateDanger": boolean }
+}`,
+      geminiSchema: {
+        type: Type.OBJECT,
+        properties: {
+          authenticityStatus: {
+            type: Type.STRING,
+            description: 'One of VERIFIED, WARNING_STRIPPED_METADATA, or FLAGGED_SYNTHETIC',
           },
-          required: ['authenticityStatus', 'confidenceScore', 'isAiGenerated', 'forensicNotes', 'metadataCheck', 'triage'],
+          confidenceScore: { type: Type.NUMBER },
+          isAiGenerated: { type: Type.BOOLEAN },
+          forensicNotes: { type: Type.STRING },
+          metadataCheck: {
+            type: Type.OBJECT,
+            properties: {
+              timestampValid: { type: Type.BOOLEAN },
+              gpsMatchMeters: { type: Type.NUMBER, nullable: true },
+              deviceDetected: { type: Type.STRING },
+            },
+            required: ['timestampValid', 'deviceDetected'],
+          },
+          triage: {
+            type: Type.OBJECT,
+            properties: {
+              department: {
+                type: Type.STRING,
+                description: 'One of Water, Electricity, Roads, Streetlights, Waste, Parks, Safety',
+              },
+              faultTitle: { type: Type.STRING },
+              severity: { type: Type.STRING, description: 'One of LOW, MODERATE, HIGH, CRITICAL' },
+              engineeringSummary: { type: Type.STRING },
+              immediateDanger: { type: Type.BOOLEAN },
+            },
+            required: ['department', 'faultTitle', 'severity', 'engineeringSummary', 'immediateDanger'],
+          },
         },
+        required: ['authenticityStatus', 'confidenceScore', 'isAiGenerated', 'forensicNotes', 'metadataCheck', 'triage'],
       },
     });
 
-    const rawText = (response.text ?? '{}').trim();
-    res.json(JSON.parse(rawText));
+    return res.json({
+      ...aiResult.data,
+      aiProvider: aiResult.provider,
+      aiProviderLabel: aiResult.providerLabel,
+      aiModel: aiResult.model,
+      fallbackUsed: aiResult.fallbackUsed,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Forensic analysis failed.';
     console.error('Forensic API error:', message);
-    res.status(500).json({ error: message });
+    return res.status(500).json({ error: message });
   }
 }
-

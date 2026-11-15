@@ -6,6 +6,7 @@ import { CommandCenterView } from './components/CommandCenterView';
 import { CouncillorDeskView } from './components/CouncillorDeskView';
 import { DirectoryView } from './components/DirectoryRewardsView';
 import { authClient, type SessionProfile } from './utils/authClient';
+import { civicApi } from './utils/civicApi';
 import { getSastTimeOfDay, type CardTimeMode } from './utils/sastTime';
 import { VERIFY_FIX_POINTS, getVerificationWindowState } from './utils/verificationWindow';
 import { LiveMapView } from './components/LiveMapView';
@@ -152,6 +153,49 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const syncPersistedReports = () => {
+      civicApi
+        .fetchReports({ role })
+        .then(({ reports: serverReports }) => {
+          if (cancelled || !Array.isArray(serverReports) || serverReports.length === 0) return;
+          setReports((prev) => {
+            const byId = new Map<string, CivicReport>();
+            for (const r of prev) byId.set(r.id, r);
+            for (const r of serverReports) {
+              const existing = byId.get(r.id);
+              byId.set(
+                r.id,
+                existing
+                  ? {
+                      ...existing,
+                      ...r,
+                      reporterPhone: r.reporterPhone ?? existing.reporterPhone,
+                      corroboratorPhones: r.corroboratorPhones ?? existing.corroboratorPhones,
+                    }
+                  : r
+              );
+            }
+            return Array.from(byId.values()).sort((a, b) => {
+              const ta = new Date(a.createdAtIso).getTime() || 0;
+              const tb = new Date(b.createdAtIso).getTime() || 0;
+              return tb - ta;
+            });
+          });
+        })
+        .catch(() => {
+          // keep client seed state if offline
+        });
+    };
+    syncPersistedReports();
+    window.addEventListener('focus', syncPersistedReports);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', syncPersistedReports);
+    };
+  }, [role]);
+
   const mergedReports = useMemo(() => {
     const byId = new Map<string, CivicReport>();
     for (const r of liveWard115Reports) {
@@ -188,6 +232,23 @@ export default function App() {
       authChannel: profile.channel || prev.authChannel,
       signedIn: true,
     }));
+
+    if (profile.mobileZa) {
+      civicApi
+        .claimRewardsByMobile(profile.mobileZa)
+        .then((res) => {
+          if (res.claimedPoints > 0) {
+            setUser((prev) => ({ ...prev, credits: prev.credits + res.claimedPoints }));
+            if (res.transactions.length > 0) {
+              setTransactions((prev) => [...res.transactions, ...prev]);
+            }
+            setToastMessage(
+              `Claimed +${res.claimedPoints} Civic Credits earned via ${profile.mobileZa}!`
+            );
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -254,8 +315,8 @@ export default function App() {
   );
 
   const activeTicketCount = useMemo(
-    () => reports.filter((r) => r.status !== 'Resolved').length,
-    [reports]
+    () => mergedReports.filter((r) => r.status !== 'Resolved').length,
+    [mergedReports]
   );
 
   const pushReward = useCallback(
@@ -292,8 +353,32 @@ export default function App() {
     }
   }, []);
 
+  const handleClaimMobileRewards = useCallback(
+    async (mobile: string): Promise<{ claimedPoints: number; claimedCount: number } | null> => {
+      if (!requireAuth('claim your mobile-linked Civic Credits')) return null;
+      const res = await civicApi.claimRewardsByMobile(mobile);
+      if (res.claimedPoints > 0) {
+        setUser((prev) => ({
+          ...prev,
+          credits: prev.credits + res.claimedPoints,
+          mobileZa: prev.mobileZa || res.normalizedMobile || prev.mobileZa,
+        }));
+        if (res.transactions.length > 0) {
+          setTransactions((prev) => [...res.transactions, ...prev]);
+        }
+        setToastMessage(
+          `Claimed +${res.claimedPoints} Civic Credits from ${res.claimedCount} report${res.claimedCount === 1 ? '' : 's'}!`
+        );
+      } else {
+        setToastMessage('No unclaimed Civic Credits found for that mobile number.');
+      }
+      return { claimedPoints: res.claimedPoints, claimedCount: res.claimedCount };
+    },
+    [requireAuth]
+  );
+
   const handleSubmitNewReport = useCallback(
-    (newReport: CivicReport, rewardPoints: number) => {
+    (newReport: CivicReport, rewardPoints: number, potentialPoints?: number) => {
       setReports((prev) => [newReport, ...prev]);
       setRole('resident');
       try {
@@ -301,6 +386,17 @@ export default function App() {
       } catch {
         // ignore storage restrictions
       }
+      civicApi
+        .createReport({
+          report: newReport,
+          reporterPhone: newReport.reporterPhone ?? (user.mobileZa || null),
+          signedIn: user.signedIn,
+          potentialPoints: potentialPoints ?? rewardPoints,
+        })
+        .catch(() => {
+          // optimistic UI already holds submitted report
+        });
+
       if (user.signedIn && rewardPoints > 0) {
         pushReward(
           newReport.forensics.status === 'VERIFIED' ? 'Verified Live Capture Report' : 'Civic Fault Logged',
@@ -312,16 +408,17 @@ export default function App() {
         );
       } else {
         setToastMessage(
-          `Report ${newReport.id} submitted as Guest. Sign in on Profile to earn Civic Credits.`
+          `Report ${newReport.id} submitted. Sign in with your mobile number on Profile → Points to claim your Civic Credits.`
         );
       }
     },
-    [user.signedIn, pushReward, activeWard.councillor.name]
+    [user.signedIn, user.mobileZa, pushReward, activeWard.councillor.name]
   );
 
   const handleCorroborateReport = useCallback(
     (reportId: string): boolean => {
       if (!requireAuth('link your household')) return false;
+      const target = mergedReports.find((r) => r.id === reportId);
       setReports((prev) =>
         prev.map((r) =>
           r.id === reportId
@@ -333,15 +430,32 @@ export default function App() {
             : r
         )
       );
+      civicApi
+        .corroborateReport({
+          reportId,
+          userPhone: user.mobileZa || null,
+          reporterName: user.name,
+          wardId: target?.wardId ?? activeWard.id,
+          wardNumber: target?.wardNumber ?? activeWard.wardNumber,
+          municipalityCode: target?.municipalityCode ?? activeWard.municipalityCode,
+          categoryId: target?.categoryId ?? 'water',
+          reportTitle: target?.title ?? `Civic Fault ${reportId}`,
+          address: target?.address ?? activeWard.suburbs[0],
+          municipalRef: target?.municipalRef ?? null,
+          status: target?.status ?? 'Logged',
+          signedIn: user.signedIn,
+        })
+        .catch(() => {});
       pushReward('Neighbor Outage Corroboration', `Linked household to ${reportId}`, 15);
       setToastMessage(`Linked your household to ${reportId} (+15 Civic Credits)`);
       return true;
     },
-    [requireAuth, pushReward]
+    [requireAuth, pushReward, mergedReports, user.mobileZa, user.name, user.signedIn, activeWard]
   );
 
   const handleInlineCorroborateFromWizard = useCallback(
-    (reportId: string) => {
+    (reportId: string, reporterInfo?: { phone?: string | null; name?: string }) => {
+      const target = mergedReports.find((r) => r.id === reportId);
       const incrementReport = (list: CivicReport[]) =>
         list.map((r) =>
           r.id === reportId
@@ -357,6 +471,24 @@ export default function App() {
         );
       setReports(incrementReport);
       setLiveWard115Reports(incrementReport);
+
+      civicApi
+        .corroborateReport({
+          reportId,
+          userPhone: reporterInfo?.phone ?? (user.mobileZa || null),
+          reporterName: reporterInfo?.name || user.name || 'Ward Resident',
+          wardId: target?.wardId ?? activeWard.id,
+          wardNumber: target?.wardNumber ?? activeWard.wardNumber,
+          municipalityCode: target?.municipalityCode ?? activeWard.municipalityCode,
+          categoryId: target?.categoryId ?? 'water',
+          reportTitle: target?.title ?? `Civic Fault ${reportId}`,
+          address: target?.address ?? activeWard.suburbs[0],
+          municipalRef: target?.municipalRef ?? null,
+          status: target?.status ?? 'Logged',
+          signedIn: user.signedIn,
+        })
+        .catch(() => {});
+
       if (user.signedIn) {
         pushReward('Neighbor Outage Corroboration', `Linked household to ${reportId}`, 15);
         setToastMessage(`Added Me Too to ${reportId} (+15 Civic Credits)`);
@@ -364,7 +496,7 @@ export default function App() {
         setToastMessage(`Added Me Too to ${reportId}`);
       }
     },
-    [user.signedIn, pushReward]
+    [user.signedIn, user.mobileZa, user.name, pushReward, mergedReports, activeWard]
   );
 
   const handleVerifyResolution = useCallback(
@@ -375,7 +507,7 @@ export default function App() {
         return false;
       }
 
-      const target = reports.find((r) => r.id === reportId) ?? reportSnapshot;
+      const target = mergedReports.find((r) => r.id === reportId) ?? reportSnapshot;
       if (target) {
         const win = getVerificationWindowState(target, verifiedFixIds);
         if (!win.canVerify) {
@@ -401,6 +533,23 @@ export default function App() {
             : r
         )
       );
+      civicApi
+        .verifyResolution({
+          reportId,
+          resolvedAtIso: target?.resolvedAtIso ?? nowIso,
+          userPhone: user.mobileZa || null,
+          reporterName: user.name,
+          wardId: target?.wardId ?? activeWard.id,
+          wardNumber: target?.wardNumber ?? activeWard.wardNumber,
+          municipalityCode: target?.municipalityCode ?? activeWard.municipalityCode,
+          categoryId: target?.categoryId ?? 'water',
+          reportTitle: target?.title ?? `Civic Fault ${reportId}`,
+          address: target?.address ?? activeWard.suburbs[0],
+          municipalRef: target?.municipalRef ?? null,
+          signedIn: user.signedIn,
+        })
+        .catch(() => {});
+
       pushReward(
         'Verify Fix Confirmation',
         `Confirmed service restoration on ${reportId}`,
@@ -409,7 +558,7 @@ export default function App() {
       setToastMessage(`Fix verified on ${reportId} (+${VERIFY_FIX_POINTS} Civic Credits)`);
       return true;
     },
-    [requireAuth, verifiedFixIds, reports, pushReward]
+    [requireAuth, verifiedFixIds, mergedReports, pushReward, user.mobileZa, user.name, user.signedIn, activeWard]
   );
 
   const handleUpdateStatus = useCallback((reportId: string, newStatus: ReportStatus) => {
@@ -431,6 +580,7 @@ export default function App() {
           : r
       )
     );
+    civicApi.patchReport(reportId, { status: newStatus }).catch(() => {});
     setToastMessage(
       newStatus === 'Resolved'
         ? `${reportId} marked restored — 15m resident Verify Fix window opened`
@@ -450,6 +600,7 @@ export default function App() {
           : r
       )
     );
+    civicApi.patchReport(reportId, { municipalRef: refCode }).catch(() => {});
     setToastMessage(`Attached reference ${refCode} to ${reportId}`);
   }, []);
 
@@ -467,6 +618,7 @@ export default function App() {
           : r
       )
     );
+    civicApi.patchReport(reportId, { sendSlaReminder: true }).catch(() => {});
     setToastMessage(`SLA follow-up escalation sent for ${reportId}`);
   }, []);
 
@@ -490,6 +642,7 @@ export default function App() {
           : r
       )
     );
+    civicApi.patchReport(reportId, { approveStrippedMedia: true }).catch(() => {});
     setToastMessage(`${reportId} manually verified and escalated to depot`);
   }, []);
 
@@ -521,10 +674,18 @@ export default function App() {
           s.id === socialId ? { ...s, linkedReportId: reportId, linkedRef: refCode } : s
         )
       );
+      civicApi
+        .recordSocialLink({
+          platform: 'WhatsApp',
+          wardId: activeWard.id,
+          linkedReportId: reportId,
+          linkedRef: refCode,
+        })
+        .catch(() => {});
       pushReward('Social Outage Thread Link', `Linked ${refCode} to community pulse`, 10);
       setToastMessage(`Linked ${refCode} to community thread (+10 Civic Credits)`);
     },
-    [pushReward]
+    [pushReward, activeWard.id]
   );
 
   const toggleEmergency = useCallback(() => setEmergencyMode((v) => !v), []);
@@ -545,15 +706,22 @@ export default function App() {
     setFocusedFeedReportId(reportId ?? null);
     setActiveView('feed');
   }, []);
-  const openProfile = useCallback(() => setActiveView('profile'), []);
 
   const handleRedeemOffer = useCallback(
-    (_offerId: string, cost: number, title: string): boolean => {
+    (offerId: string, cost: number, title: string): boolean => {
       if (!requireAuth('redeem rewards')) return false;
       if (user.credits < cost) {
         setToastMessage('Not enough Civic Credits for this reward.');
         return false;
       }
+      civicApi
+        .redeemReward({
+          offerId,
+          costCredits: cost,
+          title,
+          userPhone: user.mobileZa || undefined,
+        })
+        .catch(() => {});
       pushReward(
         'Cashed Out · ' + title,
         `Redeemed by ${user.mobileZa || user.emailOrHandle || user.name}`,
@@ -621,7 +789,7 @@ export default function App() {
 
           {activeView === 'map' && (
             <LiveMapView
-              reports={reports}
+              reports={mergedReports}
               activeWard={activeWard}
               darkMode={darkMode}
               verifiedFixIds={verifiedFixIds}
@@ -634,7 +802,7 @@ export default function App() {
 
           {activeView === 'desk' && (
             <CouncillorDeskView
-              reports={reports}
+              reports={mergedReports}
               activeWard={activeWard}
               onUpdateStatus={handleUpdateStatus}
               onAttachRef={handleAttachRef}
@@ -647,7 +815,7 @@ export default function App() {
             <SocialPulseView
               socialItems={socialItems}
               activeWard={activeWard}
-              reports={reports}
+              reports={mergedReports}
               onAddSocialItem={handleAddSocialItem}
               onLinkRefToSocial={handleLinkRefToSocial}
             />
@@ -664,7 +832,7 @@ export default function App() {
             <UserProfileView
               user={user}
               activeWard={activeWard}
-              reports={reports}
+              reports={mergedReports}
               transactions={transactions}
               monthlyBills={monthlyBills}
               initialTab={activeView === 'rewards' ? 'points' : undefined}
@@ -677,6 +845,7 @@ export default function App() {
               onOpenAuthModal={openAuthModal}
               onOpenReportModal={openDefaultReportModal}
               onRedeemOffer={handleRedeemOffer}
+              onClaimMobileRewards={handleClaimMobileRewards}
               onVerifyResolution={handleVerifyResolution}
               onAttachRef={handleAttachRef}
               onSendSlaReminder={handleSendSlaReminder}
@@ -743,13 +912,15 @@ export default function App() {
           setToastMessage('Sign up or sign in on your Profile page to earn Civic Credits.');
         }}
         signedIn={user.signedIn}
+        userMobile={user.mobileZa}
+        userName={user.signedIn ? user.name : ''}
       />
 
       <CivicAssistantDrawer
         isOpen={assistantOpen}
         onClose={() => setAssistantOpen(false)}
         activeWard={activeWard}
-        reports={reports}
+        reports={mergedReports}
         onCreateTicketFromChat={handleSubmitNewReport}
         onCorroborateFromChat={handleCorroborateReport}
       />

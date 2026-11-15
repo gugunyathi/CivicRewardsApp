@@ -125,6 +125,8 @@ export interface CivicReport {
   slaElapsedHours: number;
   assignedDepot: string;
   reporterName: string;
+  reporterPhone?: string | null;
+  corroboratorPhones?: string[];
   photoUrl?: string;
   forensics: {
     status: AuthenticityStatus;
@@ -137,6 +139,69 @@ export interface CivicReport {
   };
   escalationLog: string[];
   verifiedByResidents: number;
+}
+
+export type ReporterContributionType = 'primary_report' | 'me_too' | 'verify_fix';
+
+export interface ReporterContactRecord {
+  id: string;
+  reportId: string;
+  reportTitle: string;
+  wardId: string;
+  wardNumber: number;
+  municipalityCode: MunicipalityCode;
+  categoryId: ServiceCategoryId;
+  status: ReportStatus;
+  reporterName: string;
+  mobileNumber: string;
+  normalizedMobile: string;
+  contributionType: ReporterContributionType;
+  pointsEarned: number;
+  pointsClaimed: boolean;
+  createdAtIso: string;
+  municipalRef: string | null;
+  address: string;
+}
+
+export interface CouncillorReporterGroup {
+  normalizedMobile: string;
+  displayMobile: string;
+  reporterNames: string[];
+  reportCount: number;
+  meTooCount: number;
+  verifyCount: number;
+  totalPoints: number;
+  unclaimedPoints: number;
+  lastReportedAtIso: string;
+  reports: Array<{
+    reportId: string;
+    title: string;
+    wardId: string;
+    wardNumber: number;
+    categoryId: ServiceCategoryId;
+    status: ReportStatus;
+    municipalRef: string | null;
+    address: string;
+    contributionType: ReporterContributionType;
+    pointsEarned: number;
+    pointsClaimed: boolean;
+    createdAtIso: string;
+  }>;
+}
+
+export interface CouncillorAnalyticsSummary {
+  ok: boolean;
+  wardId: string;
+  totalReports: number;
+  openReports: number;
+  resolvedReports: number;
+  slaBreachedReports: number;
+  uniqueReporterNumbers: number;
+  totalContactSubmissions: number;
+  unclaimedPointsTotal: number;
+  byCategory: Array<{ categoryId: ServiceCategoryId; count: number; openCount: number }>;
+  reportersByMobile: CouncillorReporterGroup[];
+  submissions: ReporterContactRecord[];
 }
 
 export interface SocialPulseItem {
