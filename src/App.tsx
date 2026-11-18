@@ -804,6 +804,7 @@ export default function App() {
             <CouncillorDeskView
               reports={mergedReports}
               activeWard={activeWard}
+              darkMode={darkMode}
               onUpdateStatus={handleUpdateStatus}
               onAttachRef={handleAttachRef}
               onSendSlaReminder={handleSendSlaReminder}

@@ -263,6 +263,68 @@ async function handleWard115Map(_req: any, res: any) {
   }
 }
 
+interface WardAnalyticsCacheEntry {
+  fetchedAt: number;
+  payload: Record<string, unknown>;
+}
+
+const wardAnalyticsCache = new Map<number, WardAnalyticsCacheEntry>();
+const wardAnalyticsInFlight = new Map<number, Promise<Record<string, unknown>>>();
+
+async function fetchSignalDeskAnalytics(wardNum: number): Promise<Record<string, unknown>> {
+  const url = `https://signal-desk-municipal-councillor.vercel.app/api/ward-aggregate?ward=${wardNum}`;
+  const upstream = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!upstream.ok) {
+    throw new Error(`Signal Desk analytics HTTP ${upstream.status}`);
+  }
+  const json = (await upstream.json()) as Record<string, unknown>;
+  if (!json || json.ok === false) {
+    throw new Error('Signal Desk analytics returned empty payload.');
+  }
+  return {
+    ...json,
+    ok: true,
+    source: 'signal-desk-analytics',
+    wardNumber: wardNum,
+    fetchedAtIso: new Date().toISOString(),
+  };
+}
+
+async function handleWard115Analytics(req: any, res: any) {
+  const wardParam = String(req.query?.ward || '115').replace(/[^0-9]/g, '') || '115';
+  const wardNum = Number(wardParam) || 115;
+  const forceRefresh = req.query?.refresh === '1' || req.query?.refresh === 'true';
+
+  try {
+    const cached = wardAnalyticsCache.get(wardNum);
+    if (!forceRefresh && cached && Date.now() - cached.fetchedAt < 90_000) {
+      res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
+      res.json(cached.payload);
+      return;
+    }
+    let pending = wardAnalyticsInFlight.get(wardNum);
+    if (!pending) {
+      pending = fetchSignalDeskAnalytics(wardNum).finally(() => {
+        wardAnalyticsInFlight.delete(wardNum);
+      });
+      wardAnalyticsInFlight.set(wardNum, pending);
+    }
+    const payload = await pending;
+    wardAnalyticsCache.set(wardNum, { fetchedAt: Date.now(), payload });
+    res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
+    res.json(payload);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to reach Signal Desk analytics.';
+    console.warn('Ward analytics proxy fallback:', message);
+    res.status(502).json({
+      ok: false,
+      source: 'local-fallback',
+      wardNumber: wardNum,
+      error: message,
+    });
+  }
+}
+
 export default async function handler(req: any, res: any) {
   const action = String(req.query?.action || '');
   if (action === 'summary') {
@@ -271,6 +333,10 @@ export default async function handler(req: any, res: any) {
   }
   if (action === 'map115') {
     await handleWard115Map(req, res);
+    return;
+  }
+  if (action === 'analytics115') {
+    await handleWard115Analytics(req, res);
     return;
   }
   res.status(404).json({ error: `Unknown ward action: ${action || '(missing)'}` });

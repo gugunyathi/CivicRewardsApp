@@ -204,6 +204,42 @@ export interface CouncillorAnalyticsSummary {
   submissions: ReporterContactRecord[];
 }
 
+export interface SignalDeskWardAnalytics {
+  ok: boolean;
+  source: 'signal-desk-analytics' | 'local-fallback';
+  wardNumber: number;
+  fetchedAtIso: string;
+  total: number;
+  byStatus: Record<string, number>;
+  byCategory: Record<string, number>;
+  bySuburb: Record<string, number>;
+  byMonth: Record<string, number>;
+  daily: Array<{ date: string; count: number }>;
+  weeklyTrend: Array<{ week: string; count: number }>;
+  timeOfDay: Array<{ hour: number; count: number }>;
+  resolutionByCategory: Array<{ category: string; hours: number }>;
+  providerResponse: Array<{ provider: string; avgHours: number }>;
+  hotspotStreets: Array<{ street: string; count: number }>;
+  openVsResolved: { open: number; resolved: number };
+  avgResolutionHours: number;
+  avgDaysOpen: number;
+  buckets?: { withRef: number; withoutRef: number; resolved: number };
+  tiles?: {
+    statusBreakdown?: Record<string, number>;
+    totalNonDismissed?: number;
+    reportsToday?: number;
+    resolvedToday?: number;
+    avgResolutionHours?: number;
+  };
+  reference: {
+    withRef: number;
+    withoutRef: number;
+    pctWithRef: number;
+    byCategory: Record<string, { withRef: number; withoutRef: number }>;
+    bySuburb?: Record<string, { withRef: number; withoutRef: number }>;
+  };
+}
+
 export interface SocialPulseItem {
   id: string;
   platform: 'WhatsApp' | 'Telegram' | 'X' | 'Facebook';

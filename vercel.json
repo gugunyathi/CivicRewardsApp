@@ -15,6 +15,7 @@
     { "source": "/api/social/summarize", "destination": "/api/social?action=summarize" },
     { "source": "/api/ward/summary", "destination": "/api/ward?action=summary" },
     { "source": "/api/ward115/map", "destination": "/api/ward?action=map115" },
+    { "source": "/api/ward115/analytics", "destination": "/api/ward?action=analytics115" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

@@ -845,6 +845,59 @@ Instructions:
     }
   });
 
+  const wardAnalyticsCache = new Map<number, { fetchedAt: number; payload: Record<string, unknown> }>();
+  const wardAnalyticsInFlight = new Map<number, Promise<Record<string, unknown>>>();
+
+  app.get('/api/ward115/analytics', async (req, res) => {
+    const wardParam = String(req.query?.ward || '115').replace(/[^0-9]/g, '') || '115';
+    const wardNum = Number(wardParam) || 115;
+    const forceRefresh = req.query?.refresh === '1' || req.query?.refresh === 'true';
+
+    try {
+      const cached = wardAnalyticsCache.get(wardNum);
+      if (!forceRefresh && cached && Date.now() - cached.fetchedAt < 90_000) {
+        res.json(cached.payload);
+        return;
+      }
+      let pending = wardAnalyticsInFlight.get(wardNum);
+      if (!pending) {
+        pending = (async () => {
+          const url = `https://signal-desk-municipal-councillor.vercel.app/api/ward-aggregate?ward=${wardNum}`;
+          const upstream = await fetch(url, { signal: AbortSignal.timeout(8000) });
+          if (!upstream.ok) {
+            throw new Error(`Signal Desk analytics HTTP ${upstream.status}`);
+          }
+          const json = (await upstream.json()) as Record<string, unknown>;
+          if (!json || json.ok === false) {
+            throw new Error('Signal Desk analytics returned empty payload.');
+          }
+          return {
+            ...json,
+            ok: true,
+            source: 'signal-desk-analytics',
+            wardNumber: wardNum,
+            fetchedAtIso: new Date().toISOString(),
+          };
+        })().finally(() => {
+          wardAnalyticsInFlight.delete(wardNum);
+        });
+        wardAnalyticsInFlight.set(wardNum, pending);
+      }
+      const payload = await pending;
+      wardAnalyticsCache.set(wardNum, { fetchedAt: Date.now(), payload });
+      res.json(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to reach Signal Desk analytics.';
+      console.warn('Ward analytics proxy fallback:', message);
+      res.status(502).json({
+        ok: false,
+        source: 'local-fallback',
+        wardNumber: wardNum,
+        error: message,
+      });
+    }
+  });
+
   // Server-side Mapbox tile proxy so MAPBOX_TOKEN stays private on the server
   const MAPBOX_STYLE_MAP: Record<string, { mapboxId: string; fallbackUrl: (z: number, x: number, y: number) => string }> = {
     streets: {

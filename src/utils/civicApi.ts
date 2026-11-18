@@ -6,6 +6,7 @@ import type {
   ReportStatus,
   RewardTransaction,
   ServiceCategoryId,
+  SignalDeskWardAnalytics,
   UserRole,
 } from '../types/civic';
 
@@ -124,6 +125,12 @@ export const civicApi = {
     if (wardId) qs.set('wardId', wardId);
     if (search.trim()) qs.set('search', search.trim());
     return apiJson<CouncillorAnalyticsSummary>(`/api/councillor/analytics?${qs.toString()}`);
+  },
+
+  fetchSignalDeskAnalytics: (wardNumber = 115, refresh = false) => {
+    const qs = new URLSearchParams({ ward: String(wardNumber) });
+    if (refresh) qs.set('refresh', '1');
+    return apiJson<SignalDeskWardAnalytics>(`/api/ward115/analytics?${qs.toString()}`);
   },
 
   fetchPendingRewards: (mobile: string) =>

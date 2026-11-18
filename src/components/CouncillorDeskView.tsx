@@ -16,6 +16,7 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  TrendingUp,
   Users,
   Wrench,
   X,
@@ -34,10 +35,12 @@ import { EscalationPanel } from './EscalationPanel';
 import { MiniMapPreview } from './MiniMapPreview';
 import { SlaCountdown } from './SlaCountdown';
 import { SmartImage } from './SmartImage';
+import { WardChartsAnalytics } from './WardChartsAnalytics';
 
 interface CouncillorDeskViewProps {
   reports: CivicReport[];
   activeWard: WardRecord;
+  darkMode?: boolean;
   onUpdateStatus: (reportId: string, newStatus: ReportStatus) => void;
   onAttachRef: (reportId: string, refCode: string) => void;
   onSendSlaReminder: (reportId: string) => void;
@@ -75,12 +78,14 @@ const CONTRIBUTION_LABELS: Record<'primary_report' | 'me_too' | 'verify_fix', st
 export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(({
   reports,
   activeWard,
+  darkMode,
   onUpdateStatus,
   onAttachRef,
   onSendSlaReminder,
   onApproveStrippedMedia,
 }) => {
-  const [deskTab, setDeskTab] = useState<'queue' | 'analytics'>('queue');
+  const effectiveDarkMode = darkMode ?? isDarkTheme();
+  const [deskTab, setDeskTab] = useState<'queue' | 'charts' | 'analytics'>('queue');
   const [wardFilter, setWardFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [refDrafts, setRefDrafts] = useState<Record<string, string>>({});
@@ -214,13 +219,13 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 max-w-full">
           {/* Segmented Desk View Switcher */}
-          <div className="inline-flex items-center p-1 rounded-xl bg-slate-200/80 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.08]">
+          <div className="inline-flex items-center p-1 rounded-xl bg-slate-200/80 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.08] overflow-x-auto no-scrollbar max-w-full">
             <button
               type="button"
               onClick={() => setDeskTab('queue')}
-              className={`min-h-[34px] px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors duration-150 ${
+              className={`min-h-[36px] px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                 deskTab === 'queue'
                   ? 'bg-white text-slate-950 shadow-xs dark:bg-white dark:text-slate-950'
                   : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
@@ -231,15 +236,27 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
             </button>
             <button
               type="button"
+              onClick={() => setDeskTab('charts')}
+              className={`min-h-[36px] px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
+                deskTab === 'charts'
+                  ? 'bg-sky-600 text-white shadow-xs'
+                  : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Charts &amp; Graphs</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setDeskTab('analytics')}
-              className={`min-h-[34px] px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors duration-150 ${
+              className={`min-h-[36px] px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer transition-colors duration-150 ${
                 deskTab === 'analytics'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5" />
-              <span>Analytics &amp; Reporters</span>
+              <span>Reporters &amp; Analytics</span>
             </button>
           </div>
 
@@ -472,7 +489,7 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
                         lat={report.lat}
                         lng={report.lng}
                         zoom={14}
-                        darkMode={isDarkTheme()}
+                        darkMode={effectiveDarkMode}
                         label={`${report.address} · ${report.lat.toFixed(3)}, ${report.lng.toFixed(3)}`}
                         className="h-32 w-full rounded-xl border border-slate-300 dark:border-white/[0.08]"
                       />
@@ -599,6 +616,12 @@ export const CouncillorDeskView: React.FC<CouncillorDeskViewProps> = React.memo(
             })()
           )}
         </>
+      ) : deskTab === 'charts' ? (
+        <WardChartsAnalytics
+          activeWard={activeWard}
+          reports={reports}
+          darkMode={effectiveDarkMode}
+        />
       ) : (
         /* ANALYTICS & REPORTERS VIEW */
         <div className="space-y-4">
